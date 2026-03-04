@@ -1,0 +1,4 @@
+requests
+docling
+pillow
+huggingface-hub
