@@ -34,7 +34,7 @@ uv pip install -r requirements.txt
 
 ### 1. Docling PDF to Markdown (`docling-pdf2md.py`)
 
-Converts a PDF to Markdown using IBM's Granite VLX model via Docling. **Recommended for complex visualizations and images.**
+Converts a PDF to Markdown using IBM's Granite VLX model via Docling. **Recommended for documents that must remain local and private.**
 
 #### Usage
 
@@ -79,7 +79,7 @@ docling_output/
 
 ### 2. Mistral OCR to Markdown (`mistral-pdf2md.py`)
 
-Converts a PDF to Markdown using the Mistral OCR API. **Robust for scanned PDFs and OCR content.**
+Converts a PDF to Markdown using the Mistral OCR API. **Fast and efficient but requires an API key and data are sent to Mistral's servers.**
 
 #### Configuration
 
