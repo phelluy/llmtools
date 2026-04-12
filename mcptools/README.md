@@ -75,3 +75,29 @@ Une fois lancé, les points d'accès utiles sont :
 Important : utiliser les points d'accès en `/mcp` côté client (dans l'interface web de llama-server, rubrique MCP), même si certains logs de `mcp-proxy` affichent aussi des URLs en `/sse`.
 
 On peut aussi faire des recherche web directement à l'adresse `http://127.0.0.1:8888` (SearXNG) pour tester que SearXNG fonctionne correctement.
+
+## Lancement de llama-server avec MCP
+
+Ordre recommande :
+
+1. Lancer d'abord les serveurs MCP :
+
+```bash
+./start-mcp.sh
+```
+
+2. Lancer ensuite `llama-server` avec l'interface web MCP active (ajuster selon les dossiers choisis pour stocker les modèles) :
+
+```bash
+./build/bin/llama-server \
+  -m ../models_llm/Qwen3.5-35B-A3B/Qwen3.5-35B-A3B-UD-Q4_K_XL.gguf \
+  --mmproj ../models_llm/Qwen3.5-35B-A3B/mmproj-F16.gguf \
+  -c 262144 \
+  --chat-template-kwargs '{"enable_thinking": true}' \
+  -ctk q4_0 \
+  -ctv q4_0 \
+  --jinja \
+  --webui-mcp-proxy
+```
+
+Dans l'interface web de `llama-server`, ajouter les points d'acces MCP en `/mcp` listes dans la section precedente.
