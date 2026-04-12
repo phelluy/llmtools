@@ -1,0 +1,80 @@
+{
+  "mcpServers": {
+    "wikipedia": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-trunc-proxy",
+        "--max-bytes",
+        "20000",
+        "--preview-max-chars",
+        "3000",
+        "--head-lines",
+        "40",
+        "--tail-lines",
+        "20",
+        "--",
+        "npx",
+        "-y",
+        "wikipedia-mcp",
+        "--language",
+        "fr"
+      ]
+    },
+    "stackoverflow": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-trunc-proxy",
+        "--max-bytes",
+        "20000",
+        "--preview-max-chars",
+        "3000",
+        "--",
+        "uvx",
+        "stackoverflow-mcp"
+      ]
+    },
+    "search": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-trunc-proxy",
+        "--max-bytes",
+        "20000",
+        "--preview-max-chars",
+        "3000",
+        "--",
+        "npx",
+        "-y",
+        "mcp-searxng"
+      ],
+      "env": {
+        "SEARXNG_URL": "http://localhost:8888"
+      }
+    },
+    "python": {
+      "command": "uvx",
+      "args": [
+        "--with",
+        "sympy",
+        "--with",
+        "numpy",
+        "--with",
+        "scipy",
+        "--with",
+        "matplotlib",
+        "--with",
+        "pandas",
+        "mcp-python-interpreter",
+        "--dir",
+        "/Users/helluy/gitlab/mcp-configs",
+        "--python-path",
+        "/Users/helluy/gitlab/mcp-configs/.venv/bin/python"
+      ],
+      "env": {
+        "MCP_ALLOW_SYSTEM_ACCESS": "1"
+      }
+    }
+  }
+}
