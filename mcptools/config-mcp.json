@@ -53,7 +53,7 @@
         "--",
         "npx",
         "-y",
-        "mcp-searxng"
+        "mcp-searxng@0.4.5"
       ],
       "env": {
         "SEARXNG_URL": "http://localhost:8888"
@@ -74,9 +74,9 @@
         "pandas",
         "mcp-python-interpreter",
         "--dir",
-        "$HOME/gitlab/mcp-configs",
+        "/Users/helluy/gitlab/llmtools/mcptools/workdir/pythonfiles",
         "--python-path",
-        "$HOME/gitlab/mcp-configs/.venv/bin/python"
+        "/Users/helluy/gitlab/llmtools/mcptools/workdir/.venv/bin/python"
       ],
       "env": {
         "MCP_ALLOW_SYSTEM_ACCESS": "1"
