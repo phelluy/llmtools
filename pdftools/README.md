@@ -1,6 +1,6 @@
 # PDF to Markdown Converters
 
-Two tools to convert PDF files to Markdown with image extraction. An online tool using the Mistral OCR API, and a local tool using IBM's Granite VLM model via Docling.
+Two tools to convert PDF files to Markdown with image extraction. An online tool using the Mistral OCR API, a local tool using IBM's Granite VLM model via Docling, and a third tool using the UNISTRA Qwen API with incremental page-by-page OCR.
 
 ## Installation
 
@@ -115,19 +115,78 @@ For each PDF, generates:
 
 ---
 
-## Quick Test
+### 3. UNISTRA Qwen to Markdown (`unistra-pdf2md.py`)
 
-A demo is available in the `test/` folder:
+Converts PDFs to Markdown using the UNISTRA Qwen vision model via the `/v1/chat/completions` API. **Uses an incremental approach: each page is sent to the LLM with the accumulated context of previous pages for better OCR quality.**
+
+#### Configuration
+
+Before running the script, set the UNISTRA API key:
 
 ```bash
-# Test PDF is already generated
-ls test/sample.pdf
+export UNISTRA_API_KEY="your-api-key"
+```
 
-# Test Docling
-python docling-pdf2md.py test/sample.pdf -o test/docling_output
+#### Usage
 
-# Test Mistral (requires MISTRAL_API_KEY)
-python mistral-pdf2md.py test
+```bash
+python unistra-pdf2md.py <pdf_path>              # Single file
+python unistra-pdf2md.py <directory>              # Batch mode (recursive)
+python unistra-pdf2md.py <pdf_path> --timeout 300 # Custom timeout per page
+```
+
+#### Algorithm
+
+1. Each PDF page is converted to a JPEG image (base64).
+2. The first page is sent to the LLM with the system prompt.
+3. For each subsequent page, the image is sent along with the accumulated markdown of all previous pages as context.
+4. The LLM extracts text between `<markdown>` and `</markdown>` tags.
+5. Results are accumulated and written to the final `.md` file.
+
+This incremental context improves transcription quality by giving the LLM the full document context as it processes each page.
+
+#### Batch mode
+
+When given a directory, the script recursively finds all `.pdf` files. PDFs that already have a corresponding `.md` file are skipped.
+
+#### Output
+
+For each PDF, generates:
+- `<name>.md` - Extracted Markdown (same directory as the PDF)
+- `<name>_images/` - Empty directory reserved for future image extraction
+
+#### Example
+
+```bash
+# Convert all PDFs in a folder
+python unistra-pdf2md.py ./documents/
+
+# First run: converts all PDFs
+# Second run: skips already converted PDFs
+
+# Single file
+python unistra-pdf2md.pdf ./important.pdf
+```
+
+---
+
+## Quick Test
+
+End-to-end tests are in the `tests/` folder:
+
+```bash
+# Run all tests (requires UNISTRA_API_KEY for full test)
+uv run python tests/test_unistra.py
+```
+
+Tests cover:
+- Single PDF conversion (1 page)
+- Multi-page PDF (3 pages)
+- Batch mode with skip detection
+
+```bash
+# Test PDFs are generated in tests/test_output/
+ls tests/test_output/
 ```
 
 ---
