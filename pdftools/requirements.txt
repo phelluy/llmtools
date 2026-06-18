@@ -1,6 +1,3 @@
 requests
-docling
 pillow
 huggingface-hub
-mlx
-mlx-vlm

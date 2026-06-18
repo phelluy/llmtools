@@ -1,6 +1,6 @@
 # PDF to Markdown Converters
 
-Two tools to convert PDF files to Markdown with image extraction. An online tool using the Mistral OCR API, a local tool using IBM's Granite VLM model via Docling, and a third tool using the UNISTRA Qwen API with incremental page-by-page OCR.
+Three tools to convert PDF files to Markdown with image extraction: Mistral OCR API, UNISTRA Qwen vision API (incremental page-by-page), and a local tool using IBM's Granite VLM model via Docling.
 
 ## Installation
 
@@ -24,60 +24,15 @@ uv pip install -r requirements.txt
 
 **Dependencies:**
 - `requests` - For API calls
-- `docling` - PDF converter with VLM (Granite)
+- `docling` - PDF converter with VLM (Granite, optional, for local conversion)
 - `pillow` - Image processing
-- `huggingface-hub` - Download models
-- `mlx` - Inference on Apple Silicon (recommended for Mac)
-- `mlx-vlm` - VLM models for MLX
+- `huggingface-hub` - Download models (optional, for docling)
+- `mlx` - Inference on Apple Silicon (optional, for docling)
+- `mlx-vlm` - VLM models for MLX (optional, for docling)
 
 ## Available Tools
 
-### 1. Docling PDF to Markdown (`docling-pdf2md.py`)
-
-Converts a PDF to Markdown using IBM's Granite VLX model via Docling. **Recommended for documents that must remain local and private.**
-
-#### Usage
-
-```bash
-python docling-pdf2md.py <pdf_path> -o <output_dir>
-```
-
-#### Examples
-
-```bash
-# Basic usage
-python docling-pdf2md.py document.pdf -o output
-
-# With custom timeout (in seconds)
-python docling-pdf2md.py document.pdf -o output --timeout-seconds 300
-
-# Force Transformers engine instead of MLX
-python docling-pdf2md.py document.pdf -o output --force-transformers
-
-# Verbose logs for model download
-python docling-pdf2md.py document.pdf -o output --verbose-download
-```
-
-#### Output
-
-The output directory contains:
-- `<name>.md` - Converted Markdown with local image references
-- `<name>.json` - Complete Docling structure in JSON
-- `images/` - Images extracted from the PDF
-
-#### Example: `test/docling_output/`
-
-```
-docling_output/
-├── sample.md          # Markdown with image references
-├── sample.json        # Structured data
-└── images/
-    └── image_001.png  # Extracted image
-```
-
----
-
-### 2. Mistral OCR to Markdown (`mistral-pdf2md.py`)
+### 1. Mistral OCR to Markdown (`mistral-pdf2md.py`)
 
 Converts a PDF to Markdown using the Mistral OCR API. **Fast and efficient but requires an API key and data are sent to Mistral's servers.**
 
@@ -113,9 +68,7 @@ For each PDF, generates:
 - `<name>.md` - Extracted Markdown
 - `sample_images/` - Extracted images (if present)
 
----
-
-### 3. UNISTRA Qwen to Markdown (`unistra-pdf2md.py`)
+### 2. UNISTRA Qwen to Markdown (`unistra-pdf2md.py`)
 
 Converts PDFs to Markdown using the UNISTRA Qwen vision model via the `/v1/chat/completions` API. **Uses an incremental approach: each page is sent to the LLM with the accumulated context of previous pages for better OCR quality.**
 
@@ -197,13 +150,6 @@ ls tests/test_output/
 
 This is an internal MLX warning, not an error. The script works correctly.
 
-### ⚠️ Error: `Could not import Docling classes`
-
-Docling is not installed. Reinstall it:
-```bash
-uv pip install docling --force-reinstall
-```
-
 ### ⚠️ Error: `No API key found for Mistral`
 
 Set the API key before running:
@@ -211,23 +157,31 @@ Set the API key before running:
 export MISTRAL_API_KEY="your-key"
 ```
 
+### ⚠️ Error: `No API key found for UNISTRA`
+
+Set the API key before running:
+```bash
+export UNISTRA_API_KEY="your-key"
+```
+
 ---
 
 ## Tools Comparison
 
-| Feature | Docling | Mistral |
+| Feature | Mistral | UNISTRA |
 |---------|---------|---------|
-| Image extraction | ✅ Yes | ✅ Yes |
-| OCR | ✅ Yes (VLM) | ✅ Yes |
-| Scanned PDFs | ✅ Good | ✅ Excellent |
-| Cost | ✅ Free | ⚠️ API paid |
-| Installation | ⚠️ Heavy | ✅ Light |
-| Speed | ✅ Fast | ⚠️ Network calls |
-| Apple Silicon | ✅ MLX native | ℹ️ Network |
+| Image extraction | ✅ Yes | ❌ No (future) |
+| OCR | ✅ Yes | ✅ Yes |
+| Scanned PDFs | ✅ Excellent | ✅ Excellent |
+| Cost | ⚠️ API paid | ⚠️ API paid |
+| Installation | ✅ Light | ✅ Light |
+| Speed | ⚠️ Network calls | ⚠️ Network calls |
+| Context accumulation | ❌ No | ✅ Yes (page-by-page) |
 
 ---
 
 ## Documentation
 
-- [Docling Documentation](https://github.com/DS4SD/docling)
 - [Mistral API Documentation](https://docs.mistral.ai/)
+- [UNISTRA Qwen API](https://github.com/unistra/qwen-inference-api)
+- [Docling Documentation](https://github.com/DS4SD/docling) (optional, local conversion)

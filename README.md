@@ -3,7 +3,7 @@
 Boîte à outils pour expérimentations LLM, organisée en deux volets :
 
 - `mcptools` : serveurs MCP locaux (Python, Wikipedia, StackOverflow, recherche/SearXNG) exposés via `mcp-proxy`.
-- `pdftools` : conversion de PDF vers Markdown avec extraction d'images (en local avec Docling/Granite ou via l'API Mistral).
+- `pdftools` : conversion de PDF vers Markdown (Mistral OCR API et UNISTRA Qwen).
 
 ## Structure
 
@@ -14,9 +14,8 @@ llmtools/
 │   ├── README.md
 │   └── start-mcp.sh
 └── pdftools/
-    ├── docling-pdf2md.py
     ├── mistral-pdf2md.py
-    ├── README.md
+    ├── unistra-pdf2md.py
     ├── requirements.txt
     └── test/
 ```
@@ -68,8 +67,8 @@ Voir aussi : `mcptools/README.md`
 
 Deux scripts de conversion PDF vers Markdown :
 
-- `docling-pdf2md.py` : conversion locale (Docling + Granite VLM), adaptée aux documents privés.
-- `mistral-pdf2md.py` : conversion via l'API Mistral OCR, rapide mais nécessitant une clé d'API.
+- `mistral-pdf2md.py` : conversion via l'API Mistral OCR.
+- `unistra-pdf2md.py` : conversion via l'API UNISTRA (Qwen vision), avec accumulation de contexte page par page.
 
 ### Installation
 
@@ -78,18 +77,6 @@ cd pdftools
 uv venv
 source .venv/bin/activate
 uv pip install -r requirements.txt
-```
-
-### Utilisation de Docling (local)
-
-```bash
-python docling-pdf2md.py <chemin_pdf> -o <dossier_sortie>
-```
-
-Exemple :
-
-```bash
-python docling-pdf2md.py test/sample.pdf -o test/docling_output
 ```
 
 ### Utilisation de Mistral OCR (API)
@@ -112,14 +99,43 @@ Exemple :
 python mistral-pdf2md.py test
 ```
 
-Voir aussi : `pdftools/README.md`
+```bash
+export MISTRAL_API_KEY="votre-cle-api"
+```
 
-## Choisir le bon outil PDF
+Lancer la conversion récursive d'un dossier :
 
-- Priorité confidentialité / hors ligne : Docling.
-- Priorité simplicité / OCR distant : Mistral.
+```bash
+python mistral-pdf2md.py <dossier>
+```
 
-## Documentation détaillée
+Exemple :
+
+```bash
+python mistral-pdf2md.py test
+```
+
+### UNISTRA Qwen
+
+Configurer la clé :
+
+```bash
+export UNISTRA_API_KEY="votre-cle-api"
+```
+
+Lancer la conversion :
+
+```bash
+python unistra-pdf2md.py <fichier_ou_dossier>
+```
+
+Exemple :
+
+```bash
+python unistra-pdf2md.py test
+```
+
+## Documentation
 
 - MCP : `mcptools/README.md`
 - PDF : `pdftools/README.md`
