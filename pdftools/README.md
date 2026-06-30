@@ -33,7 +33,7 @@ python mistral-pdf2md.py <directory>
 
 ### 2. UNISTRA Qwen to Markdown (`unistra-pdf2md.py`)
 
-Convertit un PDF en Markdown via l'API UNISTRA Qwen (modèle `chat-qwen`). Approche **incrémentale page par page** : chaque page est envoyée au LLM avec le contexte des pages précédentes.
+Convertit un PDF en Markdown via l'API UNISTRA Qwen (modèle `chat-qwen`). Approche **incrémentale page par page** : chaque page est envoyée au LLM avec le contexte des pages précédentes. Les images ne sont pas extraites mais **décrites textuellement** dans le markdown (alt text court + description détaillée en italique).
 
 **Fonctionnalités clés :**
 - **Reprise automatique** : si le `.md` existe déjà, seules les pages manquantes ou en échec sont retraitées
