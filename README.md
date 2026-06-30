@@ -2,7 +2,7 @@
 
 Boîte à outils pour expérimentations LLM, organisée en deux volets :
 
-- `mcptools` : serveurs MCP locaux (Python, Wikipedia, StackOverflow, recherche/SearXNG) exposés via `mcp-proxy`.
+- `mcptools` : serveurs MCP locaux (Python, Wikipedia, recherche/SearXNG) exposés via `mcp-proxy`.
 - `pdftools` : conversion de PDF vers Markdown (Mistral OCR API et UNISTRA Qwen).
 
 ## Structure
@@ -22,14 +22,13 @@ llmtools/
 
 ## 1) Outils MCP (`mcptools`)
 
-Configuration locale de 4 serveurs MCP :
+Configuration locale de 3 serveurs MCP :
 
 - `wikipedia` (langue `fr`)
-- `stackoverflow`
 - `search` (via SearXNG local)
 - `python` (interpréteur Python MCP, avec bibliothèques scientifiques)
 
-Les serveurs `wikipedia`, `stackoverflow` et `search` sont encapsulés par `mcp-trunc-proxy` pour limiter la taille des réponses.
+Les serveurs `wikipedia` et `search` sont encapsulés par `mcp-trunc-proxy` pour limiter la taille des réponses.
 
 ### Prérequis
 
@@ -53,7 +52,6 @@ Le script :
 ### Points d'acces MCP
 
 - `http://127.0.0.1:8001/servers/wikipedia/mcp`
-- `http://127.0.0.1:8001/servers/stackoverflow/mcp`
 - `http://127.0.0.1:8001/servers/search/mcp`
 - `http://127.0.0.1:8001/servers/python/mcp`
 
