@@ -1,187 +1,128 @@
 # PDF to Markdown Converters
 
-Three tools to convert PDF files to Markdown with image extraction: Mistral OCR API, UNISTRA Qwen vision API (incremental page-by-page), and a local tool using IBM's Granite VLM model via Docling.
+Deux outils pour convertir des PDF en Markdown, plus un outil de vérification de la qualité d'extraction.
+
+| Outil | Mécanisme | Reprise | Vérification |
+|-------|-----------|---------|-------------|
+| `mistral-pdf2md.py` | API Mistral OCR | Non | Non |
+| `unistra-pdf2md.py` | API UNISTRA Qwen (vision, page par page) | Oui | Non |
+| `check-extraction.py` | Comparaison texte brut vs. extraction LLM | - | Oui |
 
 ## Installation
 
-### 1. Create a virtual environment with uv
-
 ```bash
-uv venv
-source .venv/bin/activate
+pip install pymupdf requests
 ```
 
-Or directly without activating:
-```bash
-uv venv && source .venv/bin/activate
-```
+**Dépendances :**
+- `pymupdf` — Conversion PDF → images, extraction de texte brut
+- `requests` — Appels API HTTP
 
-### 2. Install dependencies
-
-```bash
-uv pip install -r requirements.txt
-```
-
-**Dependencies:**
-- `requests` - For API calls
-- `docling` - PDF converter with VLM (Granite, optional, for local conversion)
-- `pillow` - Image processing
-- `huggingface-hub` - Download models (optional, for docling)
-- `mlx` - Inference on Apple Silicon (optional, for docling)
-- `mlx-vlm` - VLM models for MLX (optional, for docling)
-
-## Available Tools
+## Outils disponibles
 
 ### 1. Mistral OCR to Markdown (`mistral-pdf2md.py`)
 
-Converts a PDF to Markdown using the Mistral OCR API. **Fast and efficient but requires an API key and data are sent to Mistral's servers.**
-
-#### Configuration
-
-Before running the script, set the Mistral API key:
+Convertit un PDF en Markdown via l'API Mistral OCR. Rapide, extrait les images.
 
 ```bash
 export MISTRAL_API_KEY="your-api-key"
-```
-
-#### Usage
-
-```bash
 python mistral-pdf2md.py <directory>
 ```
 
-Recursively scans the directory for all `.pdf` files and creates a corresponding `.md` file.
-
-#### Example
-
-```bash
-# Convert all PDFs in the 'documents' folder
-python mistral-pdf2md.py documents
-
-# Convert PDFs in the current directory
-python mistral-pdf2md.py .
-```
-
-#### Output
-
-For each PDF, generates:
-- `<name>.md` - Extracted Markdown
-- `sample_images/` - Extracted images (if present)
+**Sortie :** `<nom>.md` + dossier `sample_images/` avec les images extraites.
 
 ### 2. UNISTRA Qwen to Markdown (`unistra-pdf2md.py`)
 
-Converts PDFs to Markdown using the UNISTRA Qwen vision model via the `/v1/chat/completions` API. **Uses an incremental approach: each page is sent to the LLM with the accumulated context of previous pages for better OCR quality.**
+Convertit un PDF en Markdown via l'API UNISTRA Qwen (modèle `chat-qwen`). Approche **incrémentale page par page** : chaque page est envoyée au LLM avec le contexte des pages précédentes.
 
-#### Configuration
-
-Before running the script, set the UNISTRA API key:
+**Fonctionnalités clés :**
+- **Reprise automatique** : si le `.md` existe déjà, seules les pages manquantes ou en échec sont retraitées
+- **Écriture incrémentale** : chaque page est sauvegardée dès qu'elle est traitée (pas de perte en cas d'interruption)
+- **Retry** : 2 tentatives par page en cas d'absence de balises `<markdown>`
+- **Contexte optimisé** : seules les 5 dernières pages + un résumé sont envoyés au LLM (évite les dépassements de contexte sur les longs documents)
+- **Métadonnées** : commentaires HTML `<!-- Page X/N : OK/ÉCHEC -->` dans le `.md` pour le suivi
+- **`--force`** : pour forcer une reconversion complète
 
 ```bash
 export UNISTRA_API_KEY="your-api-key"
-```
 
-#### Usage
+# Fichier unique
+python unistra-pdf2md.py document.pdf
 
-```bash
-python unistra-pdf2md.py <pdf_path>              # Single file
-python unistra-pdf2md.py <directory>              # Batch mode (recursive)
-python unistra-pdf2md.py <pdf_path> --timeout 300 # Custom timeout per page
-```
-
-#### Algorithm
-
-1. Each PDF page is converted to a JPEG image (base64).
-2. The first page is sent to the LLM with the system prompt.
-3. For each subsequent page, the image is sent along with the accumulated markdown of all previous pages as context.
-4. The LLM extracts text between `<markdown>` and `</markdown>` tags.
-5. Results are accumulated and written to the final `.md` file.
-
-This incremental context improves transcription quality by giving the LLM the full document context as it processes each page.
-
-#### Batch mode
-
-When given a directory, the script recursively finds all `.pdf` files. PDFs that already have a corresponding `.md` file are skipped.
-
-#### Output
-
-For each PDF, generates:
-- `<name>.md` - Extracted Markdown (same directory as the PDF)
-- `<name>_images/` - Empty directory reserved for future image extraction
-
-#### Example
-
-```bash
-# Convert all PDFs in a folder
+# Dossier (récursif)
 python unistra-pdf2md.py ./documents/
 
-# First run: converts all PDFs
-# Second run: skips already converted PDFs
+# Timeout par page personnalisé (défaut : 600s)
+python unistra-pdf2md.py document.pdf --timeout 120
 
-# Single file
-python unistra-pdf2md.pdf ./important.pdf
+# Forcer une reconversion complète
+python unistra-pdf2md.py document.pdf --force
 ```
 
----
+**Sortie :** `<nom>.md` + dossier `<nom>_images/` (réservé pour extraction future).
 
-## Quick Test
+**Exemple de reprise :**
+```bash
+# Première exécution interrompue → pages 1-8 extraites, crash page 9
+python unistra-pdf2md.py document.pdf
 
-End-to-end tests are in the `tests/` folder:
+# Seconde exécution → reprend à la page 9 automatiquement
+python unistra-pdf2md.py document.pdf
+```
+
+### 3. Vérification d'extraction (`check-extraction.py`)
+
+Compare le texte brut extrait du PDF (PyMuPDF `page.get_text()`) avec le contenu markdown généré par `unistra-pdf2md.py`. Détecte les **hallucinations graves** (divergences massives entre le texte réel et l'extraction LLM).
+
+**Métrique :** coefficient de Jaccard par page. Une page est signalée si son score est inférieur au seuil (défaut : 0.3).
 
 ```bash
-# Run all tests (requires UNISTRA_API_KEY for full test)
-uv run python tests/test_unistra.py
+# Vérification avec le .md correspondant au PDF
+python check-extraction.py document.pdf
+
+# Seuil personnalisé
+python check-extraction.py document.pdf --threshold 0.5
+
+# .md différent du PDF
+python check-extraction.py document.pdf --md autre_fichier.md
 ```
 
-Tests cover:
-- Single PDF conversion (1 page)
-- Multi-page PDF (3 pages)
-- Batch mode with skip detection
+**Sortie exemple :**
+```
+[info] 14 page(s) dans le PDF
+[info] 14 page(s) OK dans le .md
 
-```bash
-# Test PDFs are generated in tests/test_output/
-ls tests/test_output/
+  Page   1/14 : OK       Jaccard=0.864  brut=272  extrait=235
+  ...
+  Page   4/14 : FAIBLE   Jaccard=0.004  brut=346  extrait=8
+
+─── Compte rendu ───
+  Pages analysées : 14
+  Pages OK        : 13
+  Alertes         : 1
+  Pages à vérifier :
+    Page   4 : FAIBLE  (Jaccard=0.004)
 ```
 
----
+**Limites :**
+- Ne fonctionne que si le PDF a du **texte sélectionnable** (PDF natif, pas un scan)
+- Ne détecte pas les erreurs fines (noms propres, nombres) — focus sur les écarts massifs
 
-## Troubleshooting
-
-### ⚠️ Warning: `mx.metal.device_info is deprecated`
-
-This is an internal MLX warning, not an error. The script works correctly.
-
-### ⚠️ Error: `No API key found for Mistral`
-
-Set the API key before running:
-```bash
-export MISTRAL_API_KEY="your-key"
-```
-
-### ⚠️ Error: `No API key found for UNISTRA`
-
-Set the API key before running:
-```bash
-export UNISTRA_API_KEY="your-key"
-```
-
----
-
-## Tools Comparison
+## Comparaison des outils
 
 | Feature | Mistral | UNISTRA |
 |---------|---------|---------|
-| Image extraction | ✅ Yes | ❌ No (future) |
-| OCR | ✅ Yes | ✅ Yes |
-| Scanned PDFs | ✅ Excellent | ✅ Excellent |
-| Cost | ⚠️ API paid | ⚠️ API paid |
-| Installation | ✅ Light | ✅ Light |
-| Speed | ⚠️ Network calls | ⚠️ Network calls |
-| Context accumulation | ❌ No | ✅ Yes (page-by-page) |
-
----
+| Extraction d'images | Oui (fichiers réels) | Non (descriptions textuelles) |
+| OCR | Oui | Oui |
+| PDF scannés | Excellent | Excellent |
+| Reprise après interruption | Non | Oui |
+| Retry automatique | Non | Oui (2 tentatives) |
+| Métadonnées de suivi | Non | Oui (commentaires HTML) |
+| Coût | API payante | API payante |
+| Vitesse | Appels réseau | Appels réseau |
+| Contexte page par page | Non | Oui |
 
 ## Documentation
 
 - [Mistral API Documentation](https://docs.mistral.ai/)
 - [UNISTRA Qwen API](https://github.com/unistra/qwen-inference-api)
-- [Docling Documentation](https://github.com/DS4SD/docling) (optional, local conversion)
