@@ -65,10 +65,11 @@ Voir aussi : `mcptools/README.md`
 
 ## 2) Outils PDF (`pdftools`)
 
-Deux scripts de conversion PDF vers Markdown :
+Trois outils PDF :
 
 - `mistral-pdf2md.py` : conversion via l'API Mistral OCR.
-- `unistra-pdf2md.py` : conversion via l'API UNISTRA (Qwen vision), avec accumulation de contexte page par page.
+- `unistra-pdf2md.py` : conversion via l'API UNISTRA (Qwen vision), avec accumulation de contexte page par page et reprise après interruption.
+- `check-extraction.py` : vérification de la qualité d'extraction en comparant le texte brut extrait (PyMuPDF) avec le markdown généré (coefficient de Jaccard par page).
 
 ### Installation
 
