@@ -25,7 +25,7 @@ import fitz  # PyMuPDF
 import requests
 
 # ── Configuration UNISTRA Qwen ────────────────────────────────────────
-UNISTRA_URL = "https://conversation-test.ia.unistra.fr/api/v1/chat/completions"
+UNISTRA_URL = "https://conversation.ia.unistra.fr/api/v1/chat/completions"
 UNISTRA_MODEL = "chat-qwen"
 
 
@@ -128,23 +128,46 @@ def convert_pdf(pdf_path: Path, api_key: str, timeout: int = 600) -> bool:
     print(f"[info] {num_pages} page(s) détectée(s)")
 
     # 2. Système prompt
+    # Note : <markdown>...</markdown> n'est pas du GFM — c'est une balise interne
+    # utilisée pour extraire la réponse du LLM, strippée avant l'écriture du .md.
+    images_subdir = f"{stem}_images"
     system_prompt = (
-        "Tu es un expert en transcription fidèle de documents PDF. "
-        "Transcris EXACTEMENT le texte visible sur la page en Markdown. "
-        "Ne change RIEN au texte. Ne corrige PAS. "
-        "Retourne UNIQUEMENT le texte transcrit entre les balises <markdown> et </markdown>. "
+        "Tu es un expert en transcription fidèle de documents PDF.\n"
+        "Pour chaque page :\n"
+        "1. Transcris EXACTEMENT tout le texte visible, sans rien changer ni corriger.\n"
+        "2. Pour CHAQUE image, schéma, graphique, figure, photo ou illustration visible,\n"
+        "   insère à l'endroit exact où elle apparaît dans le flux le bloc suivant :\n"
+        "   | ![Courte description de l'image](IMAGES_DIR/IMAGE_ID) |\n"
+        "   |:--:|\n"
+        "   | *Description exhaustive du contenu visuel : sujet, couleurs, données\n"
+        "   représentées (si graphique), tendances, échelles, tout élément pertinent.* |\n"
+        "   - Le alt text entre crochets doit être COURT (5-10 mots max) et décrire\n"
+        "     brièvement l'image (ex: « Logo Python bleu et jaune »)\n"
+        "   - IMAGE_ID : l'identifiant fourni dans le contexte (ex: image_003.jpg)\n"
+        f"   - IMAGES_DIR : {images_subdir}\n"
+        "   - La description en italique doit être assez détaillée pour comprendre\n"
+        "     l'image sans la voir, même si le fichier est absent.\n"
+        "3. Retourne UNIQUEMENT le résultat entre <markdown> et </markdown>.\n"
         "Si la page est vide, retourne <markdown></markdown>."
     )
 
     # 3. Traitement incrémental page par page
     accumulated_text = ""
+    image_counter = 1
     page_results: list[tuple[int, str]] = []  # (page_num, transcription)
 
     for page_idx, image_b64 in enumerate(images_b64, start=1):
         print(f"  Page {page_idx}/{num_pages}...")
+
+        # Construire le contexte avec le compteur d'images
+        context_for_llm = accumulated_text
+        context_for_llm += (
+            f"\n\nProchain identifiant d'image à utiliser : image_{image_counter:03d}.jpg"
+        )
+
         response = ask_llm(
             image_b64=image_b64,
-            accumulated_context=accumulated_text,
+            accumulated_context=context_for_llm,
             system_prompt=system_prompt,
             api_key=api_key,
             timeout=timeout,
@@ -154,6 +177,11 @@ def convert_pdf(pdf_path: Path, api_key: str, timeout: int = 600) -> bool:
         if transcription is not None:
             if transcription:
                 print(f"    ✓ Page {page_idx} extraite ({len(transcription)} car.)")
+                # Mettre à jour le compteur en comptant les images référencées
+                img_count = transcription.count("| ![")
+                if img_count:
+                    print(f"    🖼  {img_count} image(s) décrite(s) (→ image_{image_counter + img_count:03d}.jpg)")
+                    image_counter += img_count
             else:
                 print(f"    ○ Page {page_idx} vide")
             page_results.append((page_idx, transcription))
