@@ -16,7 +16,7 @@ echo "SearXNG prêt."
 # 2. Lancer mcp-proxy
 echo "Démarrage de mcp-proxy..."
 uvx mcp-proxy \
-  --named-server-config config-mcp.json \
+  --named-server-config "$HOME/.mcp/config-mcp.json" \
   --allow-origin "*" \
   --port 8001 \
   --stateless 
