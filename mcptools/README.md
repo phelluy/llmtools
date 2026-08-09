@@ -7,7 +7,7 @@ Les serveurs MCP `wikipedia` et `search` sont lancés derrière `mcp-trunc-proxy
 Le principe est le suivant :
 
 1. Le client appelle `mcp-proxy` sur le port `8001`.
-2. `mcp-proxy` route la requête vers le serveur nommé configuré dans `config-mcp.json`.
+2. `mcp-proxy` route la requête vers le serveur nommé configuré dans le fichier `config-mcp*.json` de l'OS.
 3. Ce serveur nommé passe d'abord par `mcp-trunc-proxy`, qui limite la taille des réponses (`max-bytes`, `preview-max-chars`, etc.).
 4. `mcp-trunc-proxy` appelle ensuite le serveur MCP réel (`wikipedia-mcp` ou `mcp-searxng`).
 
@@ -17,8 +17,8 @@ Configuration locale de serveurs MCP (Wikipedia, Search via SearXNG, et Python) 
 
 ## Fichiers du dépôt
 
-- `start-mcp.sh` : démarre `simplexng` en arrière-plan, puis lance `mcp-proxy` avec `config-mcp.json`.
-- `config-mcp.json` : définit les serveurs MCP dans la clé `mcpServers`.
+- `start-mcp.sh` : démarre `simplexng` en arrière-plan, puis lance `mcp-proxy` avec la config adaptée à l'OS (`config-mcp-macos.json` sur macOS, `config-mcp-linux.json` sur Linux, `config-mcp.json` en repli).
+- `config-mcp*.json` : définissent les serveurs MCP dans la clé `mcpServers`.
 
 ## Prérequis
 
@@ -69,17 +69,20 @@ chmod +x start-mcp.sh
 Le script fait, dans cet ordre :
 
 1. Démarre SearXNG via `uvx --with sniffio --with anyio simplexng` (en arrière-plan).
-2. Attend 3 secondes.
+2. Attend que le port 8888 réponde (jusqu'à 15 secondes).
 3. Démarre `mcp-proxy` avec :
-   - `--named-server-config config-mcp.json`
+   - `--with "mcp<2.0.0"` (voir note ci-dessous)
+   - `--named-server-config config-mcp-macos.json` (ou `config-mcp-linux.json` selon l'OS)
    - `--allow-origin "*"`
    - `--port 8001`
    - `--stateless`
 4. À l'arrêt de `mcp-proxy` (ex: `Ctrl+C`), termine le processus SearXNG lancé par le script.
 
+> **Note sur `--with "mcp<2.0.0"`** : la version 0.12.0 de `mcp-proxy` n'est pas compatible avec le SDK MCP 2.x (qui a supprimé `request_ctx` de `mcp.server.lowlevel.server`). Sans ce pin, `uvx` résout `mcp>=2` et `mcp-proxy` plante à l'import. À retirer uniquement quand une version de `mcp-proxy` compatible SDK 2.x sera publiée.
+
 ## Serveurs exposés
 
-Le fichier `config-mcp.json` expose 3 serveurs dans `mcpServers` :
+Le fichier `config-mcp*.json` de l'OS expose 3 serveurs dans `mcpServers` :
 
 - `wikipedia`
   - via `wikipedia-mcp`

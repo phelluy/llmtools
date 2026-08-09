@@ -53,8 +53,10 @@ done
 echo "SearXNG prêt."
 
 # 2. Lancer mcp-proxy
+# NB: mcp-proxy 0.12.0 ne supporte pas encore le SDK mcp 2.x (request_ctx supprimé),
+# on épingle mcp<2.0.0 pour que uvx résolve une version compatible.
 echo "Démarrage de mcp-proxy..."
-uvx mcp-proxy \
+uvx --with "mcp<2.0.0" mcp-proxy \
   --named-server-config "$CONFIG_FILE" \
   --allow-origin "*" \
   --port 8001 \
