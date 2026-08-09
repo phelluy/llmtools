@@ -76,7 +76,7 @@ Le script fait, dans cet ordre :
 3. Démarre `mcp-proxy` avec :
    - `--with "mcp<2.0.0"` (voir note ci-dessous)
    - `--named-server-config config-mcp-macos.json` (ou `config-mcp-linux.json` selon l'OS)
-   - `--allow-origin "http://localhost:8080"` et `"http://127.0.0.1:8080"` (accès restreint à llama-server ; adapter si llama-server écoute sur un autre port)
+   - `--allow-origin "https://palgania.ovh:8106" "http://localhost:8080" "http://127.0.0.1:8080"` (accès restreint à llama-server ; le schéma + hôte + port doivent correspondre exactement à l'URL avec laquelle llama-server est accédé dans le navigateur — ex. HTTPS si accès distant)
    - `--port 8001`
    - `--stateless`
 4. À l'arrêt de `mcp-proxy` (ex: `Ctrl+C`), termine le processus SearXNG lancé par le script.
