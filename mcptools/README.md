@@ -19,6 +19,7 @@ Configuration locale de serveurs MCP (Wikipedia, Search via SearXNG, et Python) 
 
 - `start-mcp.sh` : démarre `simplexng` en arrière-plan, puis lance `mcp-proxy` avec la config adaptée à l'OS (`config-mcp-macos.json` sur macOS, `config-mcp-linux.json` sur Linux, `config-mcp.json` en repli).
 - `config-mcp*.json` : définissent les serveurs MCP dans la clé `mcpServers`.
+- `workdir/` : espace de travail du serveur `python` (`scripts/` = fichiers générés par le LLM, `pythonfiles/` = fichiers personnels, `.venv/` = interpréteur, `requirements.txt` = dépendances du venv).
 
 ## Prérequis
 
@@ -96,8 +97,9 @@ Le fichier `config-mcp*.json` de l'OS expose 3 serveurs dans `mcpServers` :
   - encapsulé avec `mcp-trunc-proxy`
 - `python`
   - via `mcp-python-interpreter`
-  - code exécuté dans le venv `workdir/.venv` (bibliothèques : `sympy`, `numpy`, `scipy`, `matplotlib`, `pandas`) ; pour recréer ce venv, voir `workdir/requirements.txt`
-  - scripts générés par le LLM écrits dans `workdir/scripts/`
+  - code inline (`run_python_code`) exécuté dans le processus du serveur, avec les bibliothèques des `--with` (`sympy`, `numpy`, `scipy`, `matplotlib`, `pandas`) ; le venv `workdir/.venv` sert au mode fichier/subprocess (`run_python_file`)
+  - accès fichiers confiné à `workdir/scripts/` (sandbox : tout chemin hors de ce dossier est refusé)
+  - pour recréer le venv, voir `workdir/requirements.txt`
 
 ## URLs à utiliser côté client MCP
 
