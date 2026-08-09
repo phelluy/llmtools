@@ -46,6 +46,8 @@ pass_ip = ["127.0.0.1", "::1"]
 EOF
 ```
 
+Note : `start-mcp.sh` cree ce fichier automatiquement s'il est absent, donc ce warning disparait des les lancements suivants du script.
+
 ### 2. Le format JSON doit etre active dans les settings
 
 Dans `~/.config/simplexng/simplexng_settings.yml`, verifier/ajouter :
@@ -68,12 +70,12 @@ chmod +x start-mcp.sh
 
 Le script fait, dans cet ordre :
 
-1. Démarre SearXNG via `uvx --with sniffio --with anyio simplexng` (en arrière-plan).
+1. Démarre SearXNG via `uvx --with sniffio --with anyio simplexng` (en arrière-plan, logs dans `searxng.log`).
 2. Attend que le port 8888 réponde (jusqu'à 15 secondes).
 3. Démarre `mcp-proxy` avec :
    - `--with "mcp<2.0.0"` (voir note ci-dessous)
    - `--named-server-config config-mcp-macos.json` (ou `config-mcp-linux.json` selon l'OS)
-   - `--allow-origin "*"`
+   - `--allow-origin "http://localhost:8080"` et `"http://127.0.0.1:8080"` (accès restreint à llama-server ; adapter si llama-server écoute sur un autre port)
    - `--port 8001`
    - `--stateless`
 4. À l'arrêt de `mcp-proxy` (ex: `Ctrl+C`), termine le processus SearXNG lancé par le script.
@@ -94,8 +96,8 @@ Le fichier `config-mcp*.json` de l'OS expose 3 serveurs dans `mcpServers` :
   - encapsulé avec `mcp-trunc-proxy`
 - `python`
   - via `mcp-python-interpreter`
-  - bibliothèques préchargées : `sympy`, `numpy`, `scipy`, `matplotlib`, `pandas`
-  - accès système activé via `MCP_ALLOW_SYSTEM_ACCESS=1`
+  - code exécuté dans le venv `workdir/.venv` (bibliothèques : `sympy`, `numpy`, `scipy`, `matplotlib`, `pandas`) ; pour recréer ce venv, voir `workdir/requirements.txt`
+  - scripts générés par le LLM écrits dans `workdir/scripts/`
 
 ## URLs à utiliser côté client MCP
 

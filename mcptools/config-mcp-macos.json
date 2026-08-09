@@ -58,13 +58,10 @@
         "pandas",
         "mcp-python-interpreter",
         "--dir",
-        "/Users/helluy/gitlab/llmtools/mcptools/workdir",
+        "/Users/helluy/gitlab/llmtools/mcptools/workdir/scripts",
         "--python-path",
         "/Users/helluy/gitlab/llmtools/mcptools/workdir/.venv/bin/python"
-      ],
-      "env": {
-        "MCP_ALLOW_SYSTEM_ACCESS": "1"
-      }
+      ]
     }
   }
 }

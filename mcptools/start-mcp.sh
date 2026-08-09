@@ -39,9 +39,25 @@ if curl -s --connect-timeout 1 http://localhost:8888 > /dev/null 2>&1; then
   exit 1
 fi
 
-# 1. Lancer SearXNG en arrière-plan
+# S'assurer que limiter.toml existe : sans lui, SearXNG bloque les requêtes
+# non-navigateur (comme celles de mcp-searxng) avec un 403.
+LIMITER_FILE="$HOME/.config/simplexng/limiter.toml"
+if [[ ! -f "$LIMITER_FILE" ]]; then
+  mkdir -p "$(dirname "$LIMITER_FILE")"
+  cat > "$LIMITER_FILE" << 'EOF'
+[botdetection.ip_limit]
+link_token = false
+
+[botdetection.ip_lists]
+block_ip = []
+pass_ip = ["127.0.0.1", "::1"]
+EOF
+  echo "Fichier $LIMITER_FILE créé (désactive le filtre anti-bot local de SearXNG)."
+fi
+
+# 1. Lancer SearXNG en arrière-plan (logs dans searxng.log)
 echo "Démarrage de SearXNG..."
-uvx --with sniffio --with anyio simplexng &
+uvx --with sniffio --with anyio simplexng > "$SCRIPT_DIR/searxng.log" 2>&1 &
 SEARXNG_PID=$!
 
 # Attendre que le port 8888 réponde (plus fiable que sleep fixe)
@@ -55,9 +71,16 @@ echo "SearXNG prêt."
 # 2. Lancer mcp-proxy
 # NB: mcp-proxy 0.12.0 ne supporte pas encore le SDK mcp 2.x (request_ctx supprimé),
 # on épingle mcp<2.0.0 pour que uvx résolve une version compatible.
+
+# Vérifier que le port 8001 est libre avant de lancer mcp-proxy
+if curl -s --connect-timeout 1 http://127.0.0.1:8001 > /dev/null 2>&1; then
+  echo "Erreur: le port 8001 est déjà utilisé. mcp-proxy est-il déjà en cours d'exécution ?" >&2
+  exit 1
+fi
+
 echo "Démarrage de mcp-proxy..."
 uvx --with "mcp<2.0.0" mcp-proxy \
   --named-server-config "$CONFIG_FILE" \
-  --allow-origin "*" \
+  --allow-origin "http://localhost:8080" "http://127.0.0.1:8080" \
   --port 8001 \
   --stateless
