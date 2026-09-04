@@ -6,15 +6,18 @@ MCP 2.x. Le code s'exécute dans un subprocess (pas in-process) avec un timeout
 wall-clock et des limites de ressources (CPU, taille de fichier, mémoire sur
 Linux).
 
-Outils exposés (mêmes noms que mcp-python-interpreter) :
-  - run_python_code(code) : exécute du code inline via un fichier temporaire
-  - run_python_file(path)  : exécute un fichier .py du sandbox
+Outils exposés :
+  - run_python_code(code)   : exécute du code inline via un fichier temporaire
+  - run_python_file(path)   : exécute un fichier .py du sandbox
+  - list_sandbox_files()    : liste les fichiers et dossiers du sandbox
+  - read_sandbox_file(path) : lit le contenu d'un fichier texte du sandbox
 
 Lancé via uvx :
   uvx --with fastmcp --with sympy --with numpy ... \
       python mcp_python_server.py --dir <sandbox>
 """
 import argparse
+import os
 import platform
 import subprocess
 import sys
@@ -29,6 +32,7 @@ TIMEOUT = 30        # wall-clock seconds
 CPU = 25            # RLIMIT_CPU seconds
 FSIZE = 50 * 1024 * 1024   # 50 MB max écriture fichier
 MEM = 2 * 1024 * 1024 * 1024  # 2 GB, RLIMIT_AS (Linux seulement)
+MAX_OUTPUT_CHARS = 15000   # Seuil de tronquage pour protéger le contexte du LLM
 
 mcp = FastMCP("python")
 SANDBOX = Path(".").resolve()
@@ -60,20 +64,63 @@ def _limits():
                 pass
 
 
+def _truncate_output(text: str) -> str:
+    """Tronque une chaîne si elle dépasse MAX_OUTPUT_CHARS."""
+    if len(text) > MAX_OUTPUT_CHARS:
+        excess = len(text) - MAX_OUTPUT_CHARS
+        return (
+            text[:MAX_OUTPUT_CHARS]
+            + f"\n\n... [Sortie tronquée : {excess} caractères supplémentaires omis]"
+        )
+    return text
+
+
+def _resolve_sandbox_path(path: str) -> Path:
+    """Résout un chemin relatif au sandbox et vérifie le confinement."""
+    target = (SANDBOX / path).resolve()
+    if SANDBOX not in target.parents and target != SANDBOX:
+        raise ValueError(f"chemin '{path}' hors du sandbox '{SANDBOX}'")
+    return target
+
+
+def _to_str(x) -> str:
+    """TimeoutExpired.stdout/stderr : bytes, str ou None selon le mode de capture."""
+    if isinstance(x, bytes):
+        return x.decode("utf-8", errors="replace")
+    return x or ""
+
+
 def _run(code_path: Path, py: str) -> str:
-    proc = subprocess.run(
-        [py, str(code_path)],
-        cwd=str(SANDBOX),
-        capture_output=True,
-        text=True,
-        timeout=TIMEOUT,
-        start_new_session=True,
-        preexec_fn=_limits,
-    )
-    out = proc.stdout
-    if proc.stderr:
-        out += ("\n--- stderr ---\n" + proc.stderr) if out else proc.stderr
-    return out or "(no output)"
+    try:
+        proc = subprocess.run(
+            [py, str(code_path)],
+            cwd=str(SANDBOX),
+            capture_output=True,
+            text=True,
+            timeout=TIMEOUT,
+            start_new_session=True,
+            preexec_fn=_limits,
+            env={**os.environ, "PYTHONUNBUFFERED": "1"},
+        )
+    except subprocess.TimeoutExpired as exc:
+        out = _to_str(exc.stdout)
+        err = _to_str(exc.stderr)
+        msg = f"Erreur : le temps d'exécution a dépassé la limite autorisée ({TIMEOUT}s)."
+        if out or err:
+            msg += "\n\nSortie partielle avant interruption :\n" + out
+            if err:
+                msg += ("\n--- stderr ---\n" + err) if out else f"--- stderr ---\n{err}"
+        return _truncate_output(msg)
+    except Exception as e:
+        return f"Erreur d'exécution du subprocess : {e}"
+
+    out = _to_str(proc.stdout)
+    err = _to_str(proc.stderr)
+    if err:
+        out += ("\n--- stderr ---\n" + err) if out else err
+    if not out:
+        return "(no output)"
+    return _truncate_output(out)
 
 
 @mcp.tool
@@ -84,7 +131,7 @@ def run_python_code(code: str) -> str:
     et limites CPU/fichier/mémoire.
     """
     with tempfile.NamedTemporaryFile(
-        "w", suffix=".py", dir=str(SANDBOX), delete=False
+        "w", prefix=".tmp_", suffix=".py", dir=str(SANDBOX), delete=False
     ) as f:
         f.write(textwrap.dedent(code))
         tmp = Path(f.name)
@@ -100,10 +147,53 @@ def run_python_file(path: str) -> str:
     stdout+stderr. Le chemin doit être à l'intérieur du sandbox. Utilise le
     python du serveur (env uvx, avec les libs --with).
     """
-    target = (SANDBOX / path).resolve()
-    if SANDBOX not in target.parents and target != SANDBOX:
-        raise ValueError(f"chemin {path} hors du sandbox {SANDBOX}")
+    target = _resolve_sandbox_path(path)
+    if target.is_dir():
+        raise IsADirectoryError(f"Le chemin spécifié est un dossier, pas un fichier : {path}")
+    if not target.is_file():
+        raise FileNotFoundError(f"Fichier introuvable dans le sandbox : {path}")
     return _run(target, SERVER_PY)
+
+
+@mcp.tool
+def list_sandbox_files() -> str:
+    """Liste les fichiers et dossiers présents dans le sandbox."""
+    if not SANDBOX.exists():
+        return f"Dossier sandbox introuvable : {SANDBOX}"
+    entries = []
+    for p in sorted(SANDBOX.rglob("*")):
+        rel = p.relative_to(SANDBOX)
+        # Ignorer fichiers et dossiers cachés
+        if any(part.startswith(".") for part in rel.parts):
+            continue
+        # Ignorer fichiers et dossiers temporaires (ex: tmp*.py)
+        if any(part.startswith("tmp") for part in rel.parts):
+            continue
+        if p.is_dir():
+            entries.append(f"[dossier] {rel}")
+        else:
+            entries.append(f"[fichier] {rel} ({p.stat().st_size} octets)")
+    if not entries:
+        return "Le sandbox est vide."
+    return "\n".join(entries)
+
+
+@mcp.tool
+def read_sandbox_file(path: str) -> str:
+    """Lit le contenu d'un fichier texte présent dans le sandbox.
+    Le chemin doit être confiné dans le sandbox. Le contenu est tronqué s'il
+    dépasse le seuil de sécurité.
+    """
+    target = _resolve_sandbox_path(path)
+    if target.is_dir():
+        raise IsADirectoryError(f"Le chemin spécifié est un dossier, pas un fichier : {path}")
+    if not target.is_file():
+        raise FileNotFoundError(f"Fichier introuvable dans le sandbox : {path}")
+    try:
+        content = target.read_text(encoding="utf-8", errors="replace")
+    except Exception as e:
+        return f"Erreur lors de la lecture du fichier : {e}"
+    return _truncate_output(content)
 
 
 def main():

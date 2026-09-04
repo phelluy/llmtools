@@ -5,7 +5,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Choisir la config selon l'OS
+# Choisir la config selon l'OS (avec repli sur config-mcp.json)
 case "$(uname)" in
   Linux)
     CONFIG_FILE="$SCRIPT_DIR/config-mcp-linux.json"
@@ -14,10 +14,14 @@ case "$(uname)" in
     CONFIG_FILE="$SCRIPT_DIR/config-mcp-macos.json"
     ;;
   *)
-    echo "OS inconnu: $(uname). Utilise config-mcp.json."
     CONFIG_FILE="$SCRIPT_DIR/config-mcp.json"
     ;;
 esac
+
+# Repli sur config-mcp.json si la config spécifique n'existe pas
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  CONFIG_FILE="$SCRIPT_DIR/config-mcp.json"
+fi
 
 # Vérifier que la config existe
 if [[ ! -f "$CONFIG_FILE" ]]; then
@@ -25,19 +29,16 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
   exit 1
 fi
 
-# Cleanup au signal
+# Cleanup au signal (n'arrête SearXNG que s'il a été lancé par ce script)
+SEARXNG_PID=""
 cleanup() {
-  echo "Arrêt de SearXNG..."
-  kill "$SEARXNG_PID" 2>/dev/null || true
+  if [[ -n "$SEARXNG_PID" ]]; then
+    echo "Arrêt de SearXNG (PID: $SEARXNG_PID)..."
+    kill "$SEARXNG_PID" 2>/dev/null || true
+  fi
   exit 0
 }
 trap cleanup EXIT INT TERM
-
-# Vérifier que le port 8888 est libre avant de lancer SearXNG
-if curl -s --connect-timeout 1 http://localhost:8888 > /dev/null 2>&1; then
-  echo "Erreur: le port 8888 est déjà utilisé. SearXNG est-il déjà en cours d'exécution ?" >&2
-  exit 1
-fi
 
 # S'assurer que limiter.toml existe : sans lui, SearXNG bloque les requêtes
 # non-navigateur (comme celles de mcp-searxng) avec un 403.
@@ -55,23 +56,34 @@ EOF
   echo "Fichier $LIMITER_FILE créé (désactive le filtre anti-bot local de SearXNG)."
 fi
 
+# Vérifier que le format JSON est activé dans simplexng_settings.yml (évite les erreurs 403)
+SETTINGS_FILE="$HOME/.config/simplexng/simplexng_settings.yml"
+if [[ -f "$SETTINGS_FILE" ]] && ! grep -q -- "- json" "$SETTINGS_FILE"; then
+  echo "Attention: le format JSON semble manquant dans $SETTINGS_FILE."
+  echo "Vérifiez que 'formats:' contient bien '- json' pour autoriser les requêtes de mcp-searxng."
+fi
+
 # Préparer le workdir du serveur python : sandbox où s'exécutent les fichiers
 # générés par le LLM. L'interpréteur est celui d'uvx (configuré dans
 # config-mcp*.json via les --with) ; plus de venv séparé.
 mkdir -p "$SCRIPT_DIR/workdir/scripts"
 
-# 1. Lancer SearXNG en arrière-plan (logs dans searxng.log)
-echo "Démarrage de SearXNG..."
-uvx --with sniffio --with anyio simplexng > "$SCRIPT_DIR/searxng.log" 2>&1 &
-SEARXNG_PID=$!
+# 1. Vérifier si SearXNG tourne déjà sur le port 8888 ou le lancer
+if curl -s --connect-timeout 1 http://localhost:8888 > /dev/null 2>&1; then
+  echo "SearXNG est déjà en cours d'exécution sur le port 8888 (réutilisation de l'instance existante)."
+else
+  echo "Démarrage de SearXNG..."
+  uvx --with sniffio --with anyio simplexng > "$SCRIPT_DIR/searxng.log" 2>&1 &
+  SEARXNG_PID=$!
 
-# Attendre que le port 8888 réponde (plus fiable que sleep fixe)
-echo "Attente de SearXNG sur le port 8888..."
-for i in $(seq 1 15); do
-  curl -s --connect-timeout 1 http://localhost:8888 > /dev/null && break
-  sleep 1
-done
-echo "SearXNG prêt."
+  # Attendre que le port 8888 réponde (plus fiable que sleep fixe)
+  echo "Attente de SearXNG sur le port 8888..."
+  for i in $(seq 1 15); do
+    curl -s --connect-timeout 1 http://localhost:8888 > /dev/null && break
+    sleep 1
+  done
+  echo "SearXNG prêt."
+fi
 
 # 2. Lancer mcp-proxy
 # NB: mcp-proxy 0.12.0 ne supporte pas encore le SDK mcp 2.x (request_ctx supprimé),
@@ -83,11 +95,26 @@ if curl -s --connect-timeout 1 http://127.0.0.1:8001 > /dev/null 2>&1; then
   exit 1
 fi
 
+# Origines autorisées : surchargeable via la variable d'environnement MCP_ALLOW_ORIGINS
+# Doit correspondre exactement au schéma + hôte + port avec lesquels llama-server
+# est accédé dans le navigateur.
+DEFAULT_ORIGINS=(
+  "https://palgania.ovh:8106"
+  "http://localhost:8080"
+  "http://127.0.0.1:8080"
+  "http://localhost:6806"
+)
+
+if [[ -n "$MCP_ALLOW_ORIGINS" ]]; then
+  # Découper la chaîne en tableau d'arguments
+  read -r -a ORIGINS <<< "$MCP_ALLOW_ORIGINS"
+else
+  ORIGINS=("${DEFAULT_ORIGINS[@]}")
+fi
+
 echo "Démarrage de mcp-proxy..."
-# Origines autorisées : doit correspondre exactement au schéma + hôte + port
-# avec lesquels llama-server est accédé dans le navigateur.
 uvx --with "mcp<2.0.0" mcp-proxy \
   --named-server-config "$CONFIG_FILE" \
-  --allow-origin "https://palgania.ovh:8106" "http://localhost:8080" "http://127.0.0.1:8080" "http://localhost:6806" \
+  --allow-origin "${ORIGINS[@]}" \
   --port 8001 \
   --stateless

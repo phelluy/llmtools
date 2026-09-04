@@ -49,9 +49,9 @@ chmod +x start-mcp.sh
 
 Le script :
 
-1. Démarre SearXNG (`simplexng`) en arrière-plan.
-2. Lance `mcp-proxy` avec la config adaptée à l'OS (`config-mcp-macos.json` / `config-mcp-linux.json`, `config-mcp.json` en repli) sur le port `8001`.
-3. Arrête proprement SearXNG quand `mcp-proxy` est stoppé.
+1. Vérifie si SearXNG (`simplexng`) tourne déjà sur le port `8888` (le réutilise ou le démarre en arrière-plan).
+2. Lance `mcp-proxy` avec la config adaptée à l'OS (`config-mcp-macos.json` / `config-mcp-linux.json`, `config-mcp.json` en repli) sur le port `8001` (avec origines configurables via `MCP_ALLOW_ORIGINS`).
+3. Arrête proprement SearXNG quand `mcp-proxy` est stoppé (uniquement s'il a été lancé par le script).
 
 ### Points d'acces MCP
 
@@ -61,7 +61,7 @@ Le script :
 
 Test direct de SearXNG : `http://127.0.0.1:8888`
 
-Note : le serveur `python` utilise `mcp_python_server.py` (serveur FastMCP maison, natif SDK MCP 2.x). Les deux outils `run_python_code` et `run_python_file` partagent un seul interpréteur — celui de l'env `uvx` (libs `--with` : sympy, numpy, scipy, matplotlib, pandas, requests). Pas de venv séparé.
+Note : le serveur `python` utilise `mcp_python_server.py` (serveur FastMCP maison, natif SDK MCP 2.x). Il expose 4 outils (`run_python_code`, `run_python_file`, `list_sandbox_files`, `read_sandbox_file`) partageant un seul interpréteur dans l'env `uvx` (libs `--with` : sympy, numpy, scipy, matplotlib, pandas, seaborn, scikit-learn, requests) avec gestion propre des timeouts et protection contre les sorties excessives. Pas de venv séparé.
 
 Voir aussi : `mcptools/README.md`
 

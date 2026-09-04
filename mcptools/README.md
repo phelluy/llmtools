@@ -72,15 +72,15 @@ chmod +x start-mcp.sh
 
 Le script fait, dans cet ordre :
 
-1. Démarre SearXNG via `uvx --with sniffio --with anyio simplexng` (en arrière-plan, logs dans `searxng.log`).
-2. Attend que le port 8888 réponde (jusqu'à 15 secondes).
+1. Vérifie si SearXNG tourne déjà sur le port 8888 : si oui, réutilise l'instance existante ; sinon, le démarre via `uvx --with sniffio --with anyio simplexng` (en arrière-plan, logs dans `searxng.log`).
+2. S'assure de la présence de `limiter.toml` et avertit si le format JSON manque dans `simplexng_settings.yml`.
 3. Démarre `mcp-proxy` avec :
    - `--with "mcp<2.0.0"` (voir note ci-dessous)
-   - `--named-server-config config-mcp-macos.json` (ou `config-mcp-linux.json` selon l'OS)
-   - `--allow-origin "https://palgania.ovh:8106" "http://localhost:8080" "http://127.0.0.1:8080" "http://localhost:6806"` (accès restreint à llama-server ; le schéma + hôte + port doivent correspondre exactement à l'URL avec laquelle llama-server est accédé dans le navigateur — ex. HTTPS si accès distant)
+   - `--named-server-config config-mcp-macos.json` (ou `config-mcp-linux.json` selon l'OS, avec repli sur `config-mcp.json`)
+   - `--allow-origin` configuré par défaut (`https://palgania.ovh:8106`, `localhost:8080`, etc.) ou surchargé via la variable d'environnement `MCP_ALLOW_ORIGINS`
    - `--port 8001`
    - `--stateless`
-4. À l'arrêt de `mcp-proxy` (ex: `Ctrl+C`), termine le processus SearXNG lancé par le script.
+4. À l'arrêt de `mcp-proxy` (ex: `Ctrl+C`), termine le processus SearXNG uniquement si celui-ci a été lancé par le script.
 
 > **Note sur le pin `mcp<2` (proxy uniquement)** : la version 0.12.0 de `mcp-proxy` n'est pas compatible avec le SDK MCP 2.x (qui a supprimé `request_ctx` de `mcp.server.lowlevel.server`). Sans ce pin, `uvx` résout `mcp>=2` et `mcp-proxy` plante à l'import. Le pin `--with "mcp<2.0.0"` reste donc nécessaire dans `start-mcp.sh` pour le proxy. À retirer uniquement quand `mcp-proxy` publiera une version compatible SDK 2.x (aucune à ce jour, y compris la branche `main`).
 >
@@ -100,10 +100,15 @@ Le fichier `config-mcp*.json` de l'OS expose 3 serveurs dans `mcpServers` :
   - encapsulé avec `mcp-trunc-proxy`
 - `python`
   - via `mcp_python_server.py` (serveur FastMCP maison, natif SDK MCP 2.x) — remplace `mcp-python-interpreter`
-  - outils : `run_python_code` (code inline) et `run_python_file` (fichier du sandbox) ; les deux s'exécutent dans un **subprocess** (pas in-process)
-  - les deux outils utilisent le même interpréteur — celui de l'env `uvx` (libs via les `--with` de la config : `sympy`, `numpy`, `scipy`, `matplotlib`, `pandas`, `requests`)
-  - garde-fous subprocess : timeout wall-clock (30 s), limite CPU (25 s), limite taille fichier écrit (50 MB), limite mémoire 2 GB (Linux seulement — `RLIMIT_AS` n'est pas fiable sur macOS)
-  - accès fichiers confiné à `workdir/scripts/` (sandbox : tout chemin hors de ce dossier est refusé)
+  - outils :
+    - `run_python_code(code)` : exécute du code inline dans un subprocess et renvoie stdout+stderr
+    - `run_python_file(path)` : exécute un fichier `.py` situé dans le sandbox
+    - `list_sandbox_files()` : liste l'ensemble des fichiers et dossiers dans le sandbox
+    - `read_sandbox_file(path)` : lit le contenu d'un fichier texte présent dans le sandbox
+  - interpréteur de l'env `uvx` avec bibliothèques pré-incluses : `sympy`, `numpy`, `scipy`, `matplotlib`, `pandas`, `seaborn`, `scikit-learn`, `requests`
+  - garde-fous subprocess : timeout wall-clock (30 s) intercepté proprement, limite CPU (25 s), limite taille fichier écrit (50 MB), limite mémoire 2 GB (Linux seulement — `RLIMIT_AS` n'est pas fiable sur macOS)
+  - protection de contexte : tronquage automatique de la sortie si celle-ci dépasse 15 000 caractères
+  - accès fichiers confiné à `workdir/scripts/` (sandbox : tout chemin relatif sortant est bloqué)
 
 ## URLs à utiliser côté client MCP
 
