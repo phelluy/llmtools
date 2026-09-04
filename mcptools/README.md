@@ -81,7 +81,9 @@ Le script fait, dans cet ordre :
    - `--stateless`
 4. À l'arrêt de `mcp-proxy` (ex: `Ctrl+C`), termine le processus SearXNG lancé par le script.
 
-> **Note sur le pin `mcp<2`** : la version 0.12.0 de `mcp-proxy` n'est pas compatible avec le SDK MCP 2.x (qui a supprimé `request_ctx` de `mcp.server.lowlevel.server`). Sans ce pin, `uvx` résout `mcp>=2` et `mcp-proxy` plante à l'import. De la même façon, `mcp-python-interpreter` importe `mcp.server.fastmcp`, supprimé en mcp 2.x (renommé en `MCPServer`) : le serveur `python` pin aussi `--with "mcp<2"` dans `config-mcp*.json` pour la même raison. À retirer uniquement quand `mcp-proxy` et `mcp-python-interpreter` seront compatibles SDK 2.x.
+> **Note sur le pin `mcp<2` (proxy uniquement)** : la version 0.12.0 de `mcp-proxy` n'est pas compatible avec le SDK MCP 2.x (qui a supprimé `request_ctx` de `mcp.server.lowlevel.server`). Sans ce pin, `uvx` résout `mcp>=2` et `mcp-proxy` plante à l'import. Le pin `--with "mcp<2.0.0"` reste donc nécessaire dans `start-mcp.sh` pour le proxy. À retirer uniquement quand `mcp-proxy` publiera une version compatible SDK 2.x (aucune à ce jour, y compris la branche `main`).
+>
+> Le serveur `python`, lui, est désormais natif SDK 2.x : `mcp-python-interpreter` (qui importait `mcp.server.fastmcp`, supprimé en mcp 2.x) a été remplacé par `mcp_python_server.py`, un serveur FastMCP maison (voir ci-dessous), sans pin de version.
 
 ## Serveurs exposés
 
@@ -96,8 +98,9 @@ Le fichier `config-mcp*.json` de l'OS expose 3 serveurs dans `mcpServers` :
   - variable d'environnement `SEARXNG_URL=http://localhost:8888`
   - encapsulé avec `mcp-trunc-proxy`
 - `python`
-  - via `mcp-python-interpreter`
-  - code inline (`run_python_code`) exécuté dans le processus du serveur, avec les bibliothèques des `--with` (`sympy`, `numpy`, `scipy`, `matplotlib`, `pandas`) ; le venv `workdir/.venv` sert au mode fichier/subprocess (`run_python_file`)
+  - via `mcp_python_server.py` (serveur FastMCP maison, natif SDK MCP 2.x) — remplace `mcp-python-interpreter`
+  - outils : `run_python_code` (code inline) et `run_python_file` (fichier du sandbox) ; les deux s'exécutent dans un **subprocess** (pas in-process) via le python du venv (`workdir/.venv/bin/python`), avec les bibliothèques des `--with` (`sympy`, `numpy`, `scipy`, `matplotlib`, `pandas`)
+  - garde-fous subprocess : timeout wall-clock (30 s), limite CPU (25 s), limite taille fichier écrit (50 MB), limite mémoire 2 GB (Linux seulement — `RLIMIT_AS` n'est pas fiable sur macOS)
   - accès fichiers confiné à `workdir/scripts/` (sandbox : tout chemin hors de ce dossier est refusé)
   - pour recréer le venv, voir `workdir/requirements.txt`
 
