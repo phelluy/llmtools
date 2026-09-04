@@ -20,7 +20,7 @@ Configuration locale de serveurs MCP (Wikipedia, Search via SearXNG, et Python) 
 - `start-mcp.sh` : démarre `simplexng` en arrière-plan, puis lance `mcp-proxy` avec la config adaptée à l'OS (`config-mcp-macos.json` sur macOS, `config-mcp-linux.json` sur Linux, `config-mcp.json` en repli).
 - `mcp_python_server.py` : serveur FastMCP maison (natif SDK MCP 2.x) exposant l'exécution de code Python sandboxé ; remplace `mcp-python-interpreter`.
 - `config-mcp*.json` : définissent les serveurs MCP dans la clé `mcpServers`.
-- `workdir/` : espace de travail du serveur `python` (`scripts/` = fichiers générés par le LLM, `pythonfiles/` = fichiers personnels, `.venv/` = interpréteur, `requirements.txt` = dépendances du venv).
+- `workdir/` : espace de travail du serveur `python` (`scripts/` = fichiers générés par le LLM, `pythonfiles/` = fichiers personnels). L'interpréteur est celui d'uvx (libs via les `--with` de `config-mcp*.json`).
 
 ## Prérequis
 
@@ -101,10 +101,9 @@ Le fichier `config-mcp*.json` de l'OS expose 3 serveurs dans `mcpServers` :
 - `python`
   - via `mcp_python_server.py` (serveur FastMCP maison, natif SDK MCP 2.x) — remplace `mcp-python-interpreter`
   - outils : `run_python_code` (code inline) et `run_python_file` (fichier du sandbox) ; les deux s'exécutent dans un **subprocess** (pas in-process)
-  - `run_python_code` utilise le python de l'env `uvx` (qui a les libs des `--with` : `sympy`, `numpy`, `scipy`, `matplotlib`, `pandas`) ; `run_python_file` utilise le python du venv utilisateur (`workdir/.venv/bin/python`, libs via `workdir/requirements.txt`)
+  - les deux outils utilisent le même interpréteur — celui de l'env `uvx` (libs via les `--with` de la config : `sympy`, `numpy`, `scipy`, `matplotlib`, `pandas`, `requests`)
   - garde-fous subprocess : timeout wall-clock (30 s), limite CPU (25 s), limite taille fichier écrit (50 MB), limite mémoire 2 GB (Linux seulement — `RLIMIT_AS` n'est pas fiable sur macOS)
   - accès fichiers confiné à `workdir/scripts/` (sandbox : tout chemin hors de ce dossier est refusé)
-  - pour recréer le venv, voir `workdir/requirements.txt`
 
 ## URLs à utiliser côté client MCP
 

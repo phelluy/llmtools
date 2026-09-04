@@ -58,12 +58,12 @@
         "matplotlib",
         "--with",
         "pandas",
+        "--with",
+        "requests",
         "python",
         "./mcp_python_server.py",
         "--dir",
-        "./workdir/scripts",
-        "--python-path",
-        "./workdir/.venv/bin/python"
+        "./workdir/scripts"
       ]
     }
   }

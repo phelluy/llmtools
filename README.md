@@ -16,7 +16,7 @@ llmtools/
 │   ├── mcp_python_server.py
 │   ├── README.md
 │   ├── start-mcp.sh
-│   └── workdir/                 (.venv/, scripts/, requirements.txt)
+│   └── workdir/                 (scripts/, pythonfiles/)
 └── pdftools/
     ├── mistral-pdf2md.py
     ├── unistra-pdf2md.py
@@ -61,7 +61,7 @@ Le script :
 
 Test direct de SearXNG : `http://127.0.0.1:8888`
 
-Note : le serveur `python` utilise `mcp_python_server.py` (serveur FastMCP maison, natif SDK MCP 2.x) avec un venv local au dépôt (`mcptools/workdir/.venv`, créé automatiquement par `start-mcp.sh` si absent). `run_python_code` tourne dans l'env `uvx` (libs `--with`) ; `run_python_file` dans le venv local (libs via `workdir/requirements.txt`).
+Note : le serveur `python` utilise `mcp_python_server.py` (serveur FastMCP maison, natif SDK MCP 2.x). Les deux outils `run_python_code` et `run_python_file` partagent un seul interpréteur — celui de l'env `uvx` (libs `--with` : sympy, numpy, scipy, matplotlib, pandas, requests). Pas de venv séparé.
 
 Voir aussi : `mcptools/README.md`
 

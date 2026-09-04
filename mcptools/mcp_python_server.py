@@ -12,7 +12,7 @@ Outils exposés (mêmes noms que mcp-python-interpreter) :
 
 Lancé via uvx :
   uvx --with fastmcp --with sympy --with numpy ... \
-      python mcp_python_server.py --dir <sandbox> --python-path <venv python>
+      python mcp_python_server.py --dir <sandbox>
 """
 import argparse
 import platform
@@ -32,10 +32,9 @@ MEM = 2 * 1024 * 1024 * 1024  # 2 GB, RLIMIT_AS (Linux seulement)
 
 mcp = FastMCP("python")
 SANDBOX = Path(".").resolve()
-# SERVER_PY = python de l'env uvx (a les libs --with : sympy, numpy, ...).
-# VENV_PY = python du venv utilisateur (pour run_python_file).
+# Python de l'env uvx (a les libs --with : sympy, numpy, ...). Utilisé par les
+# deux outils run_python_code et run_python_file — un seul interpréteur.
 SERVER_PY = sys.executable
-VENV_PY = sys.executable
 
 
 def _limits():
@@ -99,22 +98,20 @@ def run_python_code(code: str) -> str:
 def run_python_file(path: str) -> str:
     """Exécute un fichier .py du sandbox dans un subprocess et renvoie
     stdout+stderr. Le chemin doit être à l'intérieur du sandbox. Utilise le
-    python du venv utilisateur (--python-path).
+    python du serveur (env uvx, avec les libs --with).
     """
     target = (SANDBOX / path).resolve()
     if SANDBOX not in target.parents and target != SANDBOX:
         raise ValueError(f"chemin {path} hors du sandbox {SANDBOX}")
-    return _run(target, VENV_PY)
+    return _run(target, SERVER_PY)
 
 
 def main():
-    global SANDBOX, VENV_PY
+    global SANDBOX
     p = argparse.ArgumentParser(description="Serveur MCP d'exécution Python (FastMCP)")
     p.add_argument("--dir", required=True, help="dossier sandbox")
-    p.add_argument("--python-path", required=True, help="python du venv pour run_python_file")
     args, _ = p.parse_known_args()
     SANDBOX = Path(args.dir).resolve()
-    VENV_PY = args.python_path
     mcp.run(transport="stdio")
 
 
