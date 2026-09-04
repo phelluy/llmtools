@@ -18,12 +18,13 @@ Configuration locale de serveurs MCP (Wikipedia, Search via SearXNG, et Python) 
 ## Fichiers du dépôt
 
 - `start-mcp.sh` : démarre `simplexng` en arrière-plan, puis lance `mcp-proxy` avec la config adaptée à l'OS (`config-mcp-macos.json` sur macOS, `config-mcp-linux.json` sur Linux, `config-mcp.json` en repli).
+- `mcp_python_server.py` : serveur FastMCP maison (natif SDK MCP 2.x) exposant l'exécution de code Python sandboxé ; remplace `mcp-python-interpreter`.
 - `config-mcp*.json` : définissent les serveurs MCP dans la clé `mcpServers`.
 - `workdir/` : espace de travail du serveur `python` (`scripts/` = fichiers générés par le LLM, `pythonfiles/` = fichiers personnels, `.venv/` = interpréteur, `requirements.txt` = dépendances du venv).
 
 ## Prérequis
 
-- `uvx` installé (pour lancer `simplexng`, `mcp-proxy`, `mcp-python-interpreter`)
+- `uvx` installé (pour lancer `simplexng`, `mcp-proxy`, et le serveur `python` via `mcp_python_server.py`)
 - `npx` installé (Node.js) pour lancer `mcp-trunc-proxy`, `wikipedia-mcp`, `mcp-searxng`
 
 ## Depannage SearXNG (403)
@@ -76,7 +77,7 @@ Le script fait, dans cet ordre :
 3. Démarre `mcp-proxy` avec :
    - `--with "mcp<2.0.0"` (voir note ci-dessous)
    - `--named-server-config config-mcp-macos.json` (ou `config-mcp-linux.json` selon l'OS)
-   - `--allow-origin "https://palgania.ovh:8106" "http://localhost:8080" "http://127.0.0.1:8080"` (accès restreint à llama-server ; le schéma + hôte + port doivent correspondre exactement à l'URL avec laquelle llama-server est accédé dans le navigateur — ex. HTTPS si accès distant)
+   - `--allow-origin "https://palgania.ovh:8106" "http://localhost:8080" "http://127.0.0.1:8080" "http://localhost:6806"` (accès restreint à llama-server ; le schéma + hôte + port doivent correspondre exactement à l'URL avec laquelle llama-server est accédé dans le navigateur — ex. HTTPS si accès distant)
    - `--port 8001`
    - `--stateless`
 4. À l'arrêt de `mcp-proxy` (ex: `Ctrl+C`), termine le processus SearXNG lancé par le script.
@@ -99,7 +100,8 @@ Le fichier `config-mcp*.json` de l'OS expose 3 serveurs dans `mcpServers` :
   - encapsulé avec `mcp-trunc-proxy`
 - `python`
   - via `mcp_python_server.py` (serveur FastMCP maison, natif SDK MCP 2.x) — remplace `mcp-python-interpreter`
-  - outils : `run_python_code` (code inline) et `run_python_file` (fichier du sandbox) ; les deux s'exécutent dans un **subprocess** (pas in-process) via le python du venv (`workdir/.venv/bin/python`), avec les bibliothèques des `--with` (`sympy`, `numpy`, `scipy`, `matplotlib`, `pandas`)
+  - outils : `run_python_code` (code inline) et `run_python_file` (fichier du sandbox) ; les deux s'exécutent dans un **subprocess** (pas in-process)
+  - `run_python_code` utilise le python de l'env `uvx` (qui a les libs des `--with` : `sympy`, `numpy`, `scipy`, `matplotlib`, `pandas`) ; `run_python_file` utilise le python du venv utilisateur (`workdir/.venv/bin/python`, libs via `workdir/requirements.txt`)
   - garde-fous subprocess : timeout wall-clock (30 s), limite CPU (25 s), limite taille fichier écrit (50 MB), limite mémoire 2 GB (Linux seulement — `RLIMIT_AS` n'est pas fiable sur macOS)
   - accès fichiers confiné à `workdir/scripts/` (sandbox : tout chemin hors de ce dossier est refusé)
   - pour recréer le venv, voir `workdir/requirements.txt`

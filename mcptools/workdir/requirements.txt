@@ -1,5 +1,5 @@
-# Dépendances du serveur MCP python (mcp-python-interpreter).
-# Le code exécuté par le LLM tourne dans ce venv : garder ces versions à jour
+# Dépendances du venv utilisé par run_python_file (serveur MCP python, mcp_python_server.py).
+# Le code exécuté par le LLM via run_python_file tourne dans ce venv : garder ces versions à jour
 # si vous ajoutez des bibliothèques.
 #
 # Recréer le venv depuis zéro :

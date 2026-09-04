@@ -10,9 +10,13 @@ Boîte à outils pour expérimentations LLM, organisée en deux volets :
 ```text
 llmtools/
 ├── mcptools/
-│   ├── config-mcp.json
+│   ├── config-mcp.json          (repli)
+│   ├── config-mcp-macos.json
+│   ├── config-mcp-linux.json
+│   ├── mcp_python_server.py
 │   ├── README.md
-│   └── start-mcp.sh
+│   ├── start-mcp.sh
+│   └── workdir/                 (.venv/, scripts/, requirements.txt)
 └── pdftools/
     ├── mistral-pdf2md.py
     ├── unistra-pdf2md.py
@@ -46,7 +50,7 @@ chmod +x start-mcp.sh
 Le script :
 
 1. Démarre SearXNG (`simplexng`) en arrière-plan.
-2. Lance `mcp-proxy` avec `config-mcp.json` sur le port `8001`.
+2. Lance `mcp-proxy` avec la config adaptée à l'OS (`config-mcp-macos.json` / `config-mcp-linux.json`, `config-mcp.json` en repli) sur le port `8001`.
 3. Arrête proprement SearXNG quand `mcp-proxy` est stoppé.
 
 ### Points d'acces MCP
@@ -57,7 +61,7 @@ Le script :
 
 Test direct de SearXNG : `http://127.0.0.1:8888`
 
-Note : le serveur `python` utilise `mcp-python-interpreter` avec un environnement virtuel pointant vers un chemin local externe au dépôt (défini dans `mcptools/config-mcp.json`).
+Note : le serveur `python` utilise `mcp_python_server.py` (serveur FastMCP maison, natif SDK MCP 2.x) avec un venv local au dépôt (`mcptools/workdir/.venv`, créé automatiquement par `start-mcp.sh` si absent). `run_python_code` tourne dans l'env `uvx` (libs `--with`) ; `run_python_file` dans le venv local (libs via `workdir/requirements.txt`).
 
 Voir aussi : `mcptools/README.md`
 
@@ -81,22 +85,6 @@ uv pip install -r requirements.txt
 ### Utilisation de Mistral OCR (API)
 
 Configurer la clé :
-
-```bash
-export MISTRAL_API_KEY="votre-cle-api"
-```
-
-Lancer la conversion récursive d'un dossier :
-
-```bash
-python mistral-pdf2md.py <dossier>
-```
-
-Exemple :
-
-```bash
-python mistral-pdf2md.py test
-```
 
 ```bash
 export MISTRAL_API_KEY="votre-cle-api"
