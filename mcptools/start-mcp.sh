@@ -80,10 +80,9 @@ fi
 
 echo "Démarrage de mcp-proxy..."
 # Origines autorisées : doit correspondre exactement au schéma + hôte + port
-# avec lesquels llama-server est accédé dans le navigateur (ici HTTPS via
-# palgania.ovh:8106, plus localhost:8080 pour un usage local).
+# avec lesquels llama-server est accédé dans le navigateur.
 uvx --with "mcp<2.0.0" mcp-proxy \
   --named-server-config "$CONFIG_FILE" \
-  --allow-origin "https://palgania.ovh:8106" "http://localhost:8080" "http://127.0.0.1:8080" \
+  --allow-origin "https://palgania.ovh:8106" "http://localhost:8080" "http://127.0.0.1:8080" "http://localhost:6806" \
   --port 8001 \
   --stateless
