@@ -59,11 +59,11 @@
         "--with",
         "pandas",
         "python",
-        "/Users/helluy/gitlab/llmtools/mcptools/mcp_python_server.py",
+        "./mcp_python_server.py",
         "--dir",
-        "/Users/helluy/gitlab/llmtools/mcptools/workdir/scripts",
+        "./workdir/scripts",
         "--python-path",
-        "/Users/helluy/gitlab/llmtools/mcptools/workdir/.venv/bin/python"
+        "./workdir/.venv/bin/python"
       ]
     }
   }

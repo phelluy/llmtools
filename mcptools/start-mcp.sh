@@ -55,6 +55,17 @@ EOF
   echo "Fichier $LIMITER_FILE créé (désactive le filtre anti-bot local de SearXNG)."
 fi
 
+# Préparer le workdir du serveur python :
+#  - workdir/scripts/ : sandbox où s'exécutent les fichiers générés par le LLM
+#  - workdir/.venv/   : interpréteur utilisé par run_python_file (voir requirements.txt)
+mkdir -p "$SCRIPT_DIR/workdir/scripts"
+if [[ ! -x "$SCRIPT_DIR/workdir/.venv/bin/python" ]]; then
+  echo "Création du venv workdir/.venv (absent)..."
+  uv venv "$SCRIPT_DIR/workdir/.venv" --python 3.12
+  uv pip install --python "$SCRIPT_DIR/workdir/.venv/bin/python" \
+      -r "$SCRIPT_DIR/workdir/requirements.txt"
+fi
+
 # 1. Lancer SearXNG en arrière-plan (logs dans searxng.log)
 echo "Démarrage de SearXNG..."
 uvx --with sniffio --with anyio simplexng > "$SCRIPT_DIR/searxng.log" 2>&1 &
