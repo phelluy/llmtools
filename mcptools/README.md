@@ -81,7 +81,7 @@ Le script fait, dans cet ordre :
    - `--stateless`
 4. À l'arrêt de `mcp-proxy` (ex: `Ctrl+C`), termine le processus SearXNG lancé par le script.
 
-> **Note sur `--with "mcp<2.0.0"`** : la version 0.12.0 de `mcp-proxy` n'est pas compatible avec le SDK MCP 2.x (qui a supprimé `request_ctx` de `mcp.server.lowlevel.server`). Sans ce pin, `uvx` résout `mcp>=2` et `mcp-proxy` plante à l'import. À retirer uniquement quand une version de `mcp-proxy` compatible SDK 2.x sera publiée.
+> **Note sur le pin `mcp<2`** : la version 0.12.0 de `mcp-proxy` n'est pas compatible avec le SDK MCP 2.x (qui a supprimé `request_ctx` de `mcp.server.lowlevel.server`). Sans ce pin, `uvx` résout `mcp>=2` et `mcp-proxy` plante à l'import. De la même façon, `mcp-python-interpreter` importe `mcp.server.fastmcp`, supprimé en mcp 2.x (renommé en `MCPServer`) : le serveur `python` pin aussi `--with "mcp<2"` dans `config-mcp*.json` pour la même raison. À retirer uniquement quand `mcp-proxy` et `mcp-python-interpreter` seront compatibles SDK 2.x.
 
 ## Serveurs exposés
 
