@@ -37,7 +37,7 @@
         "--",
         "npx",
         "-y",
-        "mcp-searxng@0.4.5"
+        "mcp-searxng"
       ],
       "env": {
         "SEARXNG_URL": "http://localhost:8888"
