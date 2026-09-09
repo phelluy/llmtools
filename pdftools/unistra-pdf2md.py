@@ -27,7 +27,7 @@ import requests
 
 # ── Configuration UNISTRA Qwen ────────────────────────────────────────
 UNISTRA_URL = "https://conversation.ia.unistra.fr/api/v1/chat/completions"
-UNISTRA_MODEL = "chat-qwen"
+UNISTRA_MODEL = "qwen3"
 
 
 def parse_existing_md(md_path: Path) -> tuple[set[int], int, int]:
