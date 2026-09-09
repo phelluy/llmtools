@@ -284,8 +284,12 @@ def main(root_dir):
         print("❌ API key manquante. Définis MISTRAL_API_KEY dans les variables d'environnement.")
         sys.exit(1)
 
-    for dirpath, _, filenames in os.walk(root_dir):
+    for dirpath, dirnames, filenames in os.walk(root_dir):
+        # Ignorer les dossiers et fichiers cachés
+        dirnames[:] = [d for d in dirnames if not d.startswith(".")]
         for filename in filenames:
+            if filename.startswith("."):
+                continue
             if filename.lower().endswith(".pdf"):
                 pdf_path = os.path.join(dirpath, filename)
                 md_path = os.path.splitext(pdf_path)[0] + ".md"

@@ -357,8 +357,12 @@ def main() -> int:
             # Mode batch : parcours récursif
             pdf_count = 0
             skip_count = 0
-            for dirpath, _, filenames in os.walk(str(input_path)):
+            for dirpath, dirnames, filenames in os.walk(str(input_path)):
+                # Ignorer les dossiers et fichiers cachés
+                dirnames[:] = [d for d in dirnames if not d.startswith(".")]
                 for filename in filenames:
+                    if filename.startswith("."):
+                        continue
                     if filename.lower().endswith(".pdf"):
                         pdf_path = Path(dirpath) / filename
                         md_path = pdf_path.parent / f"{pdf_path.stem}.md"
