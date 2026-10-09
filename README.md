@@ -16,6 +16,7 @@ llmtools/
 │   ├── mcp_python_server.py
 │   ├── README.md
 │   ├── start-mcp.sh
+│   ├── test-formulaire/         (test end-to-end du serveur playwright)
 │   └── workdir/                 (scripts/, pythonfiles/)
 └── pdftools/
     ├── mistral-pdf2md.py
@@ -26,11 +27,12 @@ llmtools/
 
 ## 1) Outils MCP (`mcptools`)
 
-Configuration locale de 3 serveurs MCP :
+Configuration locale de 4 serveurs MCP :
 
 - `wikipedia` (langue `fr`)
 - `search` (via SearXNG local)
 - `python` (interpréteur Python MCP, avec bibliothèques scientifiques)
+- `playwright` (automatisation de navigateur Chrome : navigation, remplissage de formulaires, cases à cocher, clics)
 
 Les serveurs `wikipedia` et `search` sont encapsulés par `mcp-trunc-proxy` pour limiter la taille des réponses.
 
@@ -58,8 +60,20 @@ Le script :
 - `http://127.0.0.1:8001/servers/wikipedia/mcp`
 - `http://127.0.0.1:8001/servers/search/mcp`
 - `http://127.0.0.1:8001/servers/python/mcp`
+- `http://127.0.0.1:8001/servers/playwright/mcp`
 
 Test direct de SearXNG : `http://127.0.0.1:8888`
+
+### Test du serveur playwright
+
+Test end-to-end du remplissage de formulaire (texte + cases à cocher) via Playwright MCP :
+
+```bash
+cd mcptools/test-formulaire
+./run.sh
+```
+
+La sortie doit se terminer par `TEST REUSSI`. Voir `mcptools/README.md` pour le détail.
 
 Note : le serveur `python` utilise `mcp_python_server.py` (serveur FastMCP maison, natif SDK MCP 2.x). Il expose 4 outils (`run_python_code`, `run_python_file`, `list_sandbox_files`, `read_sandbox_file`) partageant un seul interpréteur dans l'env `uvx` (libs `--with` : sympy, numpy, scipy, matplotlib, pandas, seaborn, scikit-learn, requests) avec gestion propre des timeouts et protection contre les sorties excessives. Pas de venv séparé.
 

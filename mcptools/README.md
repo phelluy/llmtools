@@ -13,7 +13,7 @@ Le principe est le suivant :
 
 Ce montage évite les réponses trop longues, réduit le bruit dans les sorties et garde des résultats plus stables côté client.
 
-Configuration locale de serveurs MCP (Wikipedia, Search via SearXNG, et Python) exposés par `mcp-proxy` sur le port `8001`.
+Configuration locale de serveurs MCP (Wikipedia, Search via SearXNG, Python et Playwright) exposés par `mcp-proxy` sur le port `8001`.
 
 ## Fichiers du dépôt
 
@@ -21,6 +21,7 @@ Configuration locale de serveurs MCP (Wikipedia, Search via SearXNG, et Python) 
 - `mcp_python_server.py` : serveur FastMCP maison (natif SDK MCP 2.x) exposant l'exécution de code Python sandboxé ; remplace `mcp-python-interpreter`.
 - `config-mcp*.json` : définissent les serveurs MCP dans la clé `mcpServers`.
 - `workdir/` : espace de travail du serveur `python` (`scripts/` = fichiers générés par le LLM, `pythonfiles/` = fichiers personnels). L'interpréteur est celui d'uvx (libs via les `--with` de `config-mcp*.json`).
+- `test-formulaire/` : harnais de test end-to-end du serveur `playwright` (voir la section dédiée ci-dessous).
 
 ## Prérequis
 
@@ -88,7 +89,7 @@ Le script fait, dans cet ordre :
 
 ## Serveurs exposés
 
-Le fichier `config-mcp*.json` de l'OS expose 3 serveurs dans `mcpServers` :
+Le fichier `config-mcp*.json` de l'OS expose 4 serveurs dans `mcpServers` :
 
 - `wikipedia`
   - via `wikipedia-mcp`
@@ -109,6 +110,13 @@ Le fichier `config-mcp*.json` de l'OS expose 3 serveurs dans `mcpServers` :
   - garde-fous subprocess : timeout wall-clock (30 s) intercepté proprement, limite CPU (25 s), limite taille fichier écrit (50 MB), limite mémoire 2 GB (Linux seulement — `RLIMIT_AS` n'est pas fiable sur macOS)
   - protection de contexte : tronquage automatique de la sortie si celle-ci dépasse 15 000 caractères
   - accès fichiers confiné à `workdir/scripts/` (sandbox : tout chemin relatif sortant est bloqué)
+- `playwright`
+  - via `@playwright/mcp` (serveur officiel Playwright MCP)
+  - `--browser chrome` : utilise le Chrome/Chromium installé sur la machine (remplacer par `firefox`, `webkit` ou `msedge` si besoin)
+  - expose la navigation, le clic, la saisie de texte, le remplissage de formulaires texte + cases à cocher (`browser_fill_form`), la sélection dans les listes déroulantes, la gestion des onglets et des dialogues
+  - le navigateur travaille sur des snapshots d'arbre d'accessibilité (pas de captures d'écran), plus fiables pour un LLM
+  - mode visible par défaut ; profil persistant conservé entre les sessions (cookies, connexions) ; options `--headless` (invisible) et `--isolated` (profil jetable) à ajouter dans les `args` si souhaité
+  - non encapsulé par `mcp-trunc-proxy` (les snapshots contiennent des `ref` utilisées par les appels suivants, il ne faut pas les tronquer)
 
 ## URLs à utiliser côté client MCP
 
@@ -117,10 +125,29 @@ Une fois lancé, les points d'accès utiles sont :
 - http://127.0.0.1:8001/servers/wikipedia/mcp
 - http://127.0.0.1:8001/servers/search/mcp
 - http://127.0.0.1:8001/servers/python/mcp
+- http://127.0.0.1:8001/servers/playwright/mcp
 
 Important : utiliser les points d'accès en `/mcp` côté client (dans l'interface web de llama-server, rubrique MCP), même si certains logs de `mcp-proxy` affichent aussi des URLs en `/sse`.
 
 On peut aussi faire des recherche web directement à l'adresse `http://127.0.0.1:8888` (SearXNG) pour tester que SearXNG fonctionne correctement.
+
+## Test du serveur `playwright` (remplissage de formulaire)
+
+Un harnais de test end-to-end est fourni dans `test-formulaire/` :
+
+- `form.html` : formulaire local (champs texte, cases à cocher, liste déroulante) qui affiche ses valeurs soumises dans la page
+- `driver.py` : pilote le serveur Playwright MCP en JSON-RPC sur stdio, comme le ferait un client MCP : `browser_navigate` -> `browser_snapshot` (refs d'accessibilité) -> `browser_fill_form` -> `browser_click` (Envoyer) -> vérification des valeurs soumises
+- `run.sh` : sert `form.html` sur le port 8765, lance le driver, puis arrête le serveur HTTP
+
+```bash
+cd test-formulaire
+chmod +x run.sh
+./run.sh
+```
+
+Le test réussit si la sortie se termine par `TEST REUSSI` (valeurs attendues : `Jean Dupont`, `jean.dupont@example.com`, newsletter et CGU cochées, taille `M`). Prérequis : `npx` (Node.js) et Chrome installé. Le navigateur est lancé en mode `--headless --isolated` (invisible, sans impact sur le profil de navigation).
+
+> **Note sur le schéma des outils** : la version `@latest` de `@playwright/mcp` exige, pour `browser_fill_form`, des champs de la forme `{target, name, type, value}` (`type` parmi `textbox`, `checkbox`, `radio`, `combobox`, `slider` ; `value` `true`/`false` pour une case à cocher) et, pour `browser_click`, l'argument `target` (et non `ref`).
 
 ## Lancement de llama-server avec MCP
 
