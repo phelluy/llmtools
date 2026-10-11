@@ -5,3 +5,4 @@ __pycache__/
 searxng.log
 .playwright-mcp/
 .cache_new/
+mcptools/workdir/scripts/
