@@ -147,7 +147,7 @@ Cas d'usage visé : depuis le webui de llama-server, agir sur un dossier de proj
 |---|---|---|
 | Modèle | chaîne shell complète (`bash -c`) | tableau argv, pas d'interprétation shell |
 | Commandes autorisées | toutes (pas d'allowlist) | uniquement `ALLOW_COMMANDS` |
-| Dossier de travail | paramètre `cwd` libre (`~` et `$VAR` développés), défaut = sandbox | paramètre `directory` libre, défaut = CWD du serveur |
+| Dossier de travail | paramètre `cwd` libre (`~` et `$VAR` développés), défaut = sandbox | paramètre `directory` libre (absolu, pas de `~`), défaut = CWD du serveur, fixé à `~/gitlab` par le wrapper de config |
 | Sécurité | timeout + kill du groupe de processus, limites CPU/fichier, troncage sortie 15 000 car. | allowlist + rejet des métacaractères + env fils minimal + redirections contenues + audit |
 | Format de retour | en-tête `[cwd=... \| code=N]` puis stdout/stderr | stdout/stderr (code sortie dans le contenu d'erreur) |
 | Ergonomie LLM | proche d'un terminal : `grep -r foo \| wc -l` s'écrit tel quel | chaque binaire doit être allowlisté ; `&&`, boucles, sous-shells impossibles |
