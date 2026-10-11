@@ -118,6 +118,8 @@ Le fichier `config-mcp*.json` de l'OS expose 5 serveurs dans `mcpServers` :
   - allowlist de commandes via `ALLOW_COMMANDS` (voir `config-mcp*.json`) ; les métacaractères shell (`;`, `&&`, `|` en dehors des pipelines validés, backticks...) sont rejetés
   - pipelines supportés sous forme de segments argv validés (`["ls", "|", "wc", "-l"]`), redirections `<`, `>`, `>>` contenues dans le dossier de travail
   - environnement fils minimal (pas d'héritage des secrets du serveur), timeout et plafond de sortie configurables, logs d'audit
+  - **dossier de travail par défaut** : le CWD du processus serveur (aucune option du serveur pour le changer). La config l'impose via un wrapper : `bash -c 'cd "${MCP_SHELL_CWD:-$HOME/gitlab}" && exec uvx mcp-shell-server'` — défaut `$HOME/gitlab`, surchargeable en ajoutant `"MCP_SHELL_CWD": "/chemin/absolu"` dans le `env` de la config (chemin absolu obligatoire, pas d'expansion de `~`)
+  - **pas d'expansion de `~` ni de `$VAR` dans les arguments** (exécution directe sans shell) : `ls ~/gitlab` échoue ; passer des chemins absolus, ou le paramètre `directory` explicite
   - **ce serveur n'est pas un sandbox** (assumé par son auteur) : une commande autorisée garde l'autorité OS du serveur (lecture disque, réseau)
 - `playwright`
   - via `@playwright/mcp` (serveur officiel Playwright MCP)
@@ -151,6 +153,11 @@ Cas d'usage visé : depuis le webui de llama-server, agir sur un dossier de proj
 | Ergonomie LLM | proche d'un terminal : `grep -r foo \| wc -l` s'écrit tel quel | chaque binaire doit être allowlisté ; `&&`, boucles, sous-shells impossibles |
 
 Lequel choisir : `run_shell_command` pour le flux « vibe coding » (chaînes de commandes naturelles, builds, git) ; le serveur `shell` pour un périmètre restreint et audité. Les deux tournent en parallèle derrière `mcp-proxy` pour permettre la comparaison depuis le webui.
+
+Conseils d'usage depuis le webui de llama-server :
+
+- Donner le **chemin absolu du dossier projet** dans le premier prompt (ex. « travaille dans /Users/helluy/gitlab/mistral-vibe ») : le LLM part avec les coordonnées au lieu de les découvrir par essais.
+- L'exploration type « regarde ce qu'il y a dans ~/mon-dossier » passe beaucoup mieux par `run_shell_command` (expansion de `~` par bash) que par `shell_execute` (chemins absolus requis).
 
 ### Détails de `run_shell_command(cmd, cwd, timeout)`
 

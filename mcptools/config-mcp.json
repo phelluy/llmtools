@@ -80,9 +80,10 @@
       ]
     },
     "shell": {
-      "command": "uvx",
+      "command": "bash",
       "args": [
-        "mcp-shell-server"
+        "-c",
+        "cd \"${MCP_SHELL_CWD:-$HOME/gitlab}\" && exec uvx mcp-shell-server"
       ],
       "env": {
         "ALLOW_COMMANDS": "ls,cat,grep,rg,find,wc,head,tail,diff,git,python,python3,pip3,make,node,npm,cargo,mkdir,touch,cp,mv,echo,pwd"
