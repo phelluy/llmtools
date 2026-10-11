@@ -27,12 +27,13 @@ llmtools/
 
 ## 1) Outils MCP (`mcptools`)
 
-Configuration locale de 4 serveurs MCP :
+Configuration locale de 5 serveurs MCP :
 
 - `wikipedia` (langue `fr`)
 - `search` (via SearXNG local)
-- `python` (interpréteur Python MCP, avec bibliothèques scientifiques)
+- `python` (interpréteur Python MCP, avec bibliothèques scientifiques et outil shell `run_shell_command`)
 - `playwright` (automatisation de navigateur Chrome : navigation, remplissage de formulaires, cases à cocher, clics)
+- `shell` (exécution de commandes en argv avec allowlist, via `mcp-shell-server` de tumf)
 
 Les serveurs `wikipedia` et `search` sont encapsulés par `mcp-trunc-proxy` pour limiter la taille des réponses.
 

@@ -18,10 +18,11 @@ Configuration locale de serveurs MCP (Wikipedia, Search via SearXNG, Python et P
 ## Fichiers du dépôt
 
 - `start-mcp.sh` : démarre `simplexng` en arrière-plan, puis lance `mcp-proxy` avec la config adaptée à l'OS (`config-mcp-macos.json` sur macOS, `config-mcp-linux.json` sur Linux, `config-mcp.json` en repli).
-- `mcp_python_server.py` : serveur FastMCP maison (natif SDK MCP 2.x) exposant l'exécution de code Python sandboxé ; remplace `mcp-python-interpreter`.
+- `mcp_python_server.py` : serveur FastMCP maison (natif SDK MCP 2.x) exposant l'exécution de code Python sandboxé et une commande shell (`run_shell_command`) ; remplace `mcp-python-interpreter`.
 - `config-mcp*.json` : définissent les serveurs MCP dans la clé `mcpServers`.
 - `workdir/` : espace de travail du serveur `python` (`scripts/` = fichiers générés par le LLM, `pythonfiles/` = fichiers personnels). L'interpréteur est celui d'uvx (libs via les `--with` de `config-mcp*.json`).
 - `test-formulaire/` : harnais de test end-to-end du serveur `playwright` (voir la section dédiée ci-dessous).
+- `test_shell_driver.py` : test rapide (JSON-RPC stdio) de l'outil `run_shell_command` du serveur `python`.
 
 ## Prérequis
 
@@ -106,10 +107,18 @@ Le fichier `config-mcp*.json` de l'OS expose 4 serveurs dans `mcpServers` :
     - `run_python_file(path)` : exécute un fichier `.py` situé dans le sandbox
     - `list_sandbox_files()` : liste l'ensemble des fichiers et dossiers dans le sandbox
     - `read_sandbox_file(path)` : lit le contenu d'un fichier texte présent dans le sandbox
+    - `run_shell_command(cmd, cwd, timeout)` : exécute une commande shell complète (`bash -c` : pipes, `&&`, redirections, variables) dans `cwd` (voir section « Accès shell » ci-dessous)
   - interpréteur de l'env `uvx` avec bibliothèques pré-incluses : `sympy`, `numpy`, `scipy`, `matplotlib`, `pandas`, `seaborn`, `scikit-learn`, `requests`
   - garde-fous subprocess : timeout wall-clock (30 s) intercepté proprement, limite CPU (25 s), limite taille fichier écrit (50 MB), limite mémoire 2 GB (Linux seulement — `RLIMIT_AS` n'est pas fiable sur macOS)
   - protection de contexte : tronquage automatique de la sortie si celle-ci dépasse 15 000 caractères
-  - accès fichiers confiné à `workdir/scripts/` (sandbox : tout chemin relatif sortant est bloqué)
+  - accès fichiers confiné à `workdir/scripts/` (sandbox : tout chemin relatif sortant est bloqué) ; `run_shell_command` est volontairement plus permissif (voir ci-dessous)
+- `shell`
+  - via `mcp-shell-server` (github.com/tumf/mcp-shell-server, installé par `uvx`)
+  - outil unique `shell_execute(command, directory, stdin, timeout)` où `command` est un **tableau argv** (pas une chaîne shell)
+  - allowlist de commandes via `ALLOW_COMMANDS` (voir `config-mcp*.json`) ; les métacaractères shell (`;`, `&&`, `|` en dehors des pipelines validés, backticks...) sont rejetés
+  - pipelines supportés sous forme de segments argv validés (`["ls", "|", "wc", "-l"]`), redirections `<`, `>`, `>>` contenues dans le dossier de travail
+  - environnement fils minimal (pas d'héritage des secrets du serveur), timeout et plafond de sortie configurables, logs d'audit
+  - **ce serveur n'est pas un sandbox** (assumé par son auteur) : une commande autorisée garde l'autorité OS du serveur (lecture disque, réseau)
 - `playwright`
   - via `@playwright/mcp` (serveur officiel Playwright MCP)
   - `--browser chrome` : utilise le Chrome/Chromium installé sur la machine (remplacer par `firefox`, `webkit` ou `msedge` si besoin)
@@ -126,6 +135,42 @@ Une fois lancé, les points d'accès utiles sont :
 - http://127.0.0.1:8001/servers/search/mcp
 - http://127.0.0.1:8001/servers/python/mcp
 - http://127.0.0.1:8001/servers/playwright/mcp
+- http://127.0.0.1:8001/servers/shell/mcp
+
+## Accès shell : deux approches à comparer
+
+Cas d'usage visé : depuis le webui de llama-server, agir sur un dossier de projet (ex. `~/gitlab/mistral-vibe`) comme dans un harnais CLI de vibe coding, avec des interventions ponctuelles hors de ce dossier (configuration d'un logiciel, etc.).
+
+| | `run_shell_command` (serveur `python`) | `shell_execute` (serveur `shell`, tumf) |
+|---|---|---|
+| Modèle | chaîne shell complète (`bash -c`) | tableau argv, pas d'interprétation shell |
+| Commandes autorisées | toutes (pas d'allowlist) | uniquement `ALLOW_COMMANDS` |
+| Dossier de travail | paramètre `cwd` libre (`~` et `$VAR` développés), défaut = sandbox | paramètre `directory` libre, défaut = CWD du serveur |
+| Sécurité | timeout + kill du groupe de processus, limites CPU/fichier, troncage sortie 15 000 car. | allowlist + rejet des métacaractères + env fils minimal + redirections contenues + audit |
+| Format de retour | en-tête `[cwd=... \| code=N]` puis stdout/stderr | stdout/stderr (code sortie dans le contenu d'erreur) |
+| Ergonomie LLM | proche d'un terminal : `grep -r foo \| wc -l` s'écrit tel quel | chaque binaire doit être allowlisté ; `&&`, boucles, sous-shells impossibles |
+
+Lequel choisir : `run_shell_command` pour le flux « vibe coding » (chaînes de commandes naturelles, builds, git) ; le serveur `shell` pour un périmètre restreint et audité. Les deux tournent en parallèle derrière `mcp-proxy` pour permettre la comparaison depuis le webui.
+
+### Détails de `run_shell_command(cmd, cwd, timeout)`
+
+- `cmd` : chaîne passée à `bash -c` (pipes, `&&`, redirections, variables d'environnement).
+- `cwd` : dossier de travail ; `~` et `$VAR` sont développés ; vide → `workdir/scripts/`. **Un chemin absolu quelconque est accepté** (interventions ponctuelles hors du dossier de projet) — choix assumé : l'outil n'est pas un sandbox.
+- `timeout` : secondes wall-clock (0 → 120 s, plafond 600 s). Au dépassement, tout le groupe de processus est tué (SIGKILL sur le groupe, pas seulement le shell direct).
+- Limites héritées du serveur : CPU ≈ timeout, écriture fichier max 50 MB, sortie tronquée à 15 000 caractères.
+
+Test rapide (server en stdio, sans proxy) :
+
+```bash
+cd mcptools
+python3 test_shell_driver.py
+```
+
+### Durcissement éventuel
+
+- Linux : envelopper le serveur `shell` dans Bubblewrap (`bwrap --ro-bind /usr /usr --bind <projet> <projet> --dev /dev --proc /proc --unshare-net`), ou utiliser `@mako10k/mcp-shell-server` en mode `restrictive` (Bubblewrap, Linux seulement).
+- macOS : pas de Bubblewrap ; minimum crédible = allowlist étroite côté tumf, ou compte utilisateur dédié sans privilèges pour le serveur.
+- Dans tous les cas : ces serveurs tournent avec l'identité OS de `mcp-proxy` ; ne pas exposer le port 8001 au-delà de `--allow-origin` local.
 
 Important : utiliser les points d'accès en `/mcp` côté client (dans l'interface web de llama-server, rubrique MCP), même si certains logs de `mcp-proxy` affichent aussi des URLs en `/sse`.
 

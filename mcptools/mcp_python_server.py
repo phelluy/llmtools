@@ -7,10 +7,11 @@ wall-clock et des limites de ressources (CPU, taille de fichier, mémoire sur
 Linux).
 
 Outils exposés :
-  - run_python_code(code)   : exécute du code inline via un fichier temporaire
-  - run_python_file(path)   : exécute un fichier .py du sandbox
-  - list_sandbox_files()    : liste les fichiers et dossiers du sandbox
-  - read_sandbox_file(path) : lit le contenu d'un fichier texte du sandbox
+  - run_python_code(code)    : exécute du code inline via un fichier temporaire
+  - run_python_file(path)    : exécute un fichier .py du sandbox
+  - list_sandbox_files()     : liste les fichiers et dossiers du sandbox
+  - read_sandbox_file(path)  : lit le contenu d'un fichier texte du sandbox
+  - run_shell_command(cmd, cwd, timeout) : exécute une commande shell (bash -c)
 
 Lancé via uvx :
   uvx --with fastmcp --with sympy --with numpy ... \
@@ -19,6 +20,7 @@ Lancé via uvx :
 import argparse
 import os
 import platform
+import signal
 import subprocess
 import sys
 import tempfile
@@ -33,6 +35,8 @@ CPU = 25            # RLIMIT_CPU seconds
 FSIZE = 50 * 1024 * 1024   # 50 MB max écriture fichier
 MEM = 2 * 1024 * 1024 * 1024  # 2 GB, RLIMIT_AS (Linux seulement)
 MAX_OUTPUT_CHARS = 15000   # Seuil de tronquage pour protéger le contexte du LLM
+SHELL_TIMEOUT = 120        # wall-clock par défaut pour run_shell_command (s)
+SHELL_MAX_TIMEOUT = 600    # plafond du paramètre timeout (s)
 
 mcp = FastMCP("python")
 SANDBOX = Path(".").resolve()
@@ -41,11 +45,11 @@ SANDBOX = Path(".").resolve()
 SERVER_PY = sys.executable
 
 
-def _limits():
+def _limits(cpu_seconds: int = CPU):
     """Limites de ressources appliquées dans l'enfant avant exec (Unix)."""
     import resource
     for lim, val in (
-        (getattr(resource, "RLIMIT_CPU", None), CPU),
+        (getattr(resource, "RLIMIT_CPU", None), cpu_seconds),
         (getattr(resource, "RLIMIT_FSIZE", None), FSIZE),
     ):
         if lim is not None:
@@ -194,6 +198,78 @@ def read_sandbox_file(path: str) -> str:
     except Exception as e:
         return f"Erreur lors de la lecture du fichier : {e}"
     return _truncate_output(content)
+
+
+@mcp.tool
+def run_shell_command(cmd: str, cwd: str = "", timeout: int = 0) -> str:
+    """Exécute une commande shell (bash -c) dans un dossier de travail et
+    renvoie stdout+stderr ainsi que le code retour.
+
+    Conçu pour un usage "harnais de vibe coding" : la commande est une chaîne
+    shell complète (pipes, &&, redirections, variables d'environnement...).
+
+    - cwd : dossier de travail de la commande. ~ et $VAR sont développés.
+      Vide → dossier sandbox par défaut. Un chemin absolu quelconque est
+      accepté, y compris hors du sandbox (interventions ponctuelles :
+      configuration d'un logiciel, etc.) — c'est un choix assumé.
+    - timeout : limite wall-clock en secondes (0 → défaut 120 s, plafond 600 s).
+      Au dépassement, tout le groupe de processus est tué (SIGKILL).
+    - Limites héritées du serveur : CPU ~= timeout, taille fichier écrite 50 MB,
+      sortie tronquée à 15000 caractères.
+    """
+    if not cmd.strip():
+        return "Erreur : commande vide."
+    if timeout <= 0:
+        timeout = SHELL_TIMEOUT
+    timeout = min(timeout, SHELL_MAX_TIMEOUT)
+    if cwd:
+        workdir = Path(os.path.expandvars(os.path.expanduser(cwd))).resolve()
+        if not workdir.is_dir():
+            return f"Erreur : le dossier de travail n'existe pas : {workdir}"
+    else:
+        workdir = SANDBOX
+
+    shell = "/bin/bash" if Path("/bin/bash").exists() else "/bin/sh"
+    try:
+        proc = subprocess.Popen(
+            [shell, "-c", cmd],
+            cwd=str(workdir),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
+            preexec_fn=lambda: _limits(timeout),
+            env={**os.environ, "PYTHONUNBUFFERED": "1"},
+        )
+    except Exception as e:
+        return f"Erreur au lancement de la commande : {e}"
+
+    try:
+        out, err = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        # Tuer tout le groupe (bash + descendants), pas seulement bash.
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            proc.kill()
+        out, err = proc.communicate()
+        msg = (
+            f"Erreur : la commande a dépassé la limite de {timeout}s "
+            "(groupe de processus tué)."
+        )
+        if out or err:
+            msg += "\n\nSortie partielle avant interruption :\n" + (out or "")
+            if err:
+                msg += "\n--- stderr ---\n" + err
+        return _truncate_output(msg)
+
+    output = out or ""
+    if err:
+        output += ("\n--- stderr ---\n" + err) if output else err
+    header = f"[cwd={workdir} | code={proc.returncode}]"
+    if not output:
+        return _truncate_output(f"{header}\n(no output)")
+    return _truncate_output(f"{header}\n{output}")
 
 
 def main():
