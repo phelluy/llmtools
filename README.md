@@ -2,8 +2,8 @@
 
 Boîte à outils pour expérimentations LLM, organisée en deux volets :
 
-- `mcptools` : serveurs MCP locaux (Python, Wikipedia, recherche/SearXNG) exposés via `mcp-proxy`.
-- `pdftools` : conversion de PDF vers Markdown (Mistral OCR API et UNISTRA Qwen).
+- `mcptools` : serveurs MCP locaux (Wikipedia, recherche/SearXNG, Python, Playwright, shell) exposés via `mcp-proxy`.
+- `pdftools` : conversion de PDF vers Markdown (Mistral OCR API et UNISTRA Qwen), avec vérification de la qualité d'extraction.
 
 ## Structure
 
@@ -18,12 +18,15 @@ llmtools/
 │   ├── start-mcp.sh
 │   ├── test-formulaire/         (test end-to-end du serveur playwright)
 │   ├── test_shell_driver.py     (test stdio de run_shell_command)
-│   └── workdir/                 (scripts/, pythonfiles/)
+│   └── workdir/                 (espace de travail du serveur python, non versionné)
 └── pdftools/
     ├── mistral-pdf2md.py
     ├── unistra-pdf2md.py
+    ├── check-extraction.py      (vérification qualité d'extraction)
+    ├── README.md
     ├── requirements.txt
-    └── test/
+    ├── test/                    (PDF et échantillons d'exemple)
+    └── tests/                   (test end-to-end de unistra-pdf2md)
 ```
 
 ## 1) Outils MCP (`mcptools`)
@@ -78,7 +81,23 @@ cd mcptools/test-formulaire
 
 La sortie doit se terminer par `TEST REUSSI`. Voir `mcptools/README.md` pour le détail.
 
+### Test du serveur python (accès shell)
+
+Test stdio de l'outil `run_shell_command` (lancement direct, sans `mcp-proxy`) :
+
+```bash
+cd mcptools
+python3 test_shell_driver.py
+```
+
+Vérifie : cas nominal, expansion de `~`, code retour, dossier inexistant, timeout avec kill du groupe de processus, tronquage de sortie, pipelines.
+
 Note : le serveur `python` utilise `mcp_python_server.py` (serveur FastMCP maison, natif SDK MCP 2.x). Il expose 5 outils (`run_python_code`, `run_python_file`, `list_sandbox_files`, `read_sandbox_file`, `run_shell_command`) partageant un seul interpréteur dans l'env `uvx` (libs `--with` : sympy, numpy, scipy, matplotlib, pandas, seaborn, scikit-learn, requests) avec gestion propre des timeouts et protection contre les sorties excessives. Pas de venv séparé. L'accès shell (outil `run_shell_command` + serveur `shell` de tumf) est détaillé dans `mcptools/README.md`.
+
+### Connexion des clients MCP
+
+- **llama-server** (webui) : ajouter les points d'accès `/servers/<nom>/mcp` listés ci-dessus dans la rubrique MCP de l'interface web, avec `--webui-mcp-proxy` au lancement. Commande complète dans `mcptools/README.md`.
+- **mistral-vibe** : déclarer le serveur voulu dans `~/.vibe/config.toml` (transport `streamable-http`). Seul `playwright` est utile dans Vibe, les autres serveurs étant redondants avec ses outils natifs. Détail dans `mcptools/README.md`.
 
 Voir aussi : `mcptools/README.md`
 
@@ -137,6 +156,16 @@ Exemple :
 
 ```bash
 python unistra-pdf2md.py test
+```
+
+### Vérification et tests
+
+- `check-extraction.py` : compare le texte brut (PyMuPDF) avec le markdown généré (coefficient de Jaccard par page). Voir `pdftools/README.md`.
+- Test end-to-end de `unistra-pdf2md.py` (nécessite `UNISTRA_API_KEY`) :
+
+```bash
+cd pdftools
+python tests/test_unistra.py
 ```
 
 ## Documentation
