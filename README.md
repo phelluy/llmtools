@@ -17,6 +17,7 @@ llmtools/
 │   ├── README.md
 │   ├── start-mcp.sh
 │   ├── test-formulaire/         (test end-to-end du serveur playwright)
+│   ├── test_shell_driver.py     (test stdio de run_shell_command)
 │   └── workdir/                 (scripts/, pythonfiles/)
 └── pdftools/
     ├── mistral-pdf2md.py
@@ -62,6 +63,7 @@ Le script :
 - `http://127.0.0.1:8001/servers/search/mcp`
 - `http://127.0.0.1:8001/servers/python/mcp`
 - `http://127.0.0.1:8001/servers/playwright/mcp`
+- `http://127.0.0.1:8001/servers/shell/mcp`
 
 Test direct de SearXNG : `http://127.0.0.1:8888`
 
@@ -76,7 +78,7 @@ cd mcptools/test-formulaire
 
 La sortie doit se terminer par `TEST REUSSI`. Voir `mcptools/README.md` pour le détail.
 
-Note : le serveur `python` utilise `mcp_python_server.py` (serveur FastMCP maison, natif SDK MCP 2.x). Il expose 4 outils (`run_python_code`, `run_python_file`, `list_sandbox_files`, `read_sandbox_file`) partageant un seul interpréteur dans l'env `uvx` (libs `--with` : sympy, numpy, scipy, matplotlib, pandas, seaborn, scikit-learn, requests) avec gestion propre des timeouts et protection contre les sorties excessives. Pas de venv séparé.
+Note : le serveur `python` utilise `mcp_python_server.py` (serveur FastMCP maison, natif SDK MCP 2.x). Il expose 5 outils (`run_python_code`, `run_python_file`, `list_sandbox_files`, `read_sandbox_file`, `run_shell_command`) partageant un seul interpréteur dans l'env `uvx` (libs `--with` : sympy, numpy, scipy, matplotlib, pandas, seaborn, scikit-learn, requests) avec gestion propre des timeouts et protection contre les sorties excessives. Pas de venv séparé. L'accès shell (outil `run_shell_command` + serveur `shell` de tumf) est détaillé dans `mcptools/README.md`.
 
 Voir aussi : `mcptools/README.md`
 

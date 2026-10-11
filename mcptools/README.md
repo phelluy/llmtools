@@ -13,7 +13,7 @@ Le principe est le suivant :
 
 Ce montage évite les réponses trop longues, réduit le bruit dans les sorties et garde des résultats plus stables côté client.
 
-Configuration locale de serveurs MCP (Wikipedia, Search via SearXNG, Python et Playwright) exposés par `mcp-proxy` sur le port `8001`.
+Configuration locale de 5 serveurs MCP (Wikipedia, Search via SearXNG, Python, Playwright et Shell) exposés par `mcp-proxy` sur le port `8001`.
 
 ## Fichiers du dépôt
 
@@ -90,7 +90,7 @@ Le script fait, dans cet ordre :
 
 ## Serveurs exposés
 
-Le fichier `config-mcp*.json` de l'OS expose 4 serveurs dans `mcpServers` :
+Le fichier `config-mcp*.json` de l'OS expose 5 serveurs dans `mcpServers` :
 
 - `wikipedia`
   - via `wikipedia-mcp`
@@ -219,3 +219,18 @@ Ordre recommande :
 ```
 
 Dans l'interface web de `llama-server`, ajouter les points d'acces MCP en `/mcp` listes dans la section precedente.
+
+## Connexion d'autres clients MCP (ex. mistral-vibe)
+
+`mcp-proxy` exposant les serveurs en streamable-http, n'importe quel client MCP peut s'y brancher. Exemple pour [mistral-vibe](https://github.com/mistralai/mistral-vibe), dans `~/.vibe/config.toml` :
+
+```toml
+[[mcp_servers]]
+name = "playwright"
+transport = "streamable-http"
+url = "http://127.0.0.1:8001/servers/playwright/mcp"
+```
+
+Puis `/reload` dans Vibe (ou relance). Note : un serveur local sans authentification se déclare en éditant le TOML — `/mcp add` ne gère que l'OAuth et `vibe mcp add` que l'auth statique.
+
+Seul `playwright` vaut le coup dans Vibe : les autres serveurs (`wikipedia`, `search`, `python`, `shell`) sont redondants avec ses outils natifs (bash, fichiers, recherche web via connecteurs). Aucune configuration Vibe supplémentaire n'est nécessaire ; retenir simplement qu'il faut que `./start-mcp.sh` tourne avant de lancer le client.
