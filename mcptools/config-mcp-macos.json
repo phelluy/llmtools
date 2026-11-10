@@ -76,7 +76,9 @@
         "-y",
         "@playwright/mcp@latest",
         "--browser",
-        "chrome"
+        "chrome",
+        "--user-data-dir",
+        "/Users/helluy/.playwright-mcp-profile"
       ]
     },
     "shell": {
