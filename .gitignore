@@ -4,6 +4,6 @@ __pycache__/
 *.pyc
 searxng.log
 .playwright-mcp/
+.cache/
 .cache_new/
-mcptools/workdir/scripts/
-mcptools/workdir/pythonfiles/
+mcptools/workdir/
